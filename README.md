@@ -1,19 +1,19 @@
-# forge-renderer
+# forge
 
 Browser library for rendering [Card Maker](https://github.com/maxfrost1308/card-maker) `.forge` projects without the full editor UI.
 
 ## Installation
 
 ```bash
-npm install forge-renderer papaparse jszip
+npm install forge papaparse jszip
 ```
 
-PapaParse and JSZip are **peer dependencies** — install them alongside forge-renderer.
+PapaParse and JSZip are **peer dependencies** — install them alongside forge.
 
 ## Usage
 
 ```js
-import { renderCard, parseCsv, deserializeProject } from "forge-renderer";
+import { renderCard, parseCsv, deserializeProject } from "forge";
 
 // Load a .forge project
 const project = await deserializeProject(forgeFileArrayBuffer);

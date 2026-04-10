@@ -1,5 +1,5 @@
 {
-  "name": "forge-renderer",
+  "name": "forge",
   "version": "0.1.0",
   "type": "module",
   "description": "Browser library for rendering Card Maker .forge projects without the full editor",
