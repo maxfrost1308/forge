@@ -71,7 +71,7 @@ const html = renderCard(data[0], project.cardType);
 
 ## Format Specification
 
-See the [Forge Format Specification](../card-maker/docs/forge-spec.md) for the complete `.forge` file format reference.
+See the [Forge Format Specification](https://github.com/maxfrost1308/card-maker/blob/beta/docs/forge-spec.md) for the complete `.forge` file format reference.
 
 ## License
 
