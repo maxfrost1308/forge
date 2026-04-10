@@ -1,0 +1,23 @@
+{
+  "name": "forge-renderer",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Browser library for rendering Card Maker .forge projects without the full editor",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "papaparse": "^5.4.1",
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0",
+    "jsdom": "^25.0.0",
+    "papaparse": "^5.4.1",
+    "jszip": "^3.10.1"
+  }
+}
