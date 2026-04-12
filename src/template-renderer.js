@@ -527,7 +527,11 @@ export function preprocessRow(row, fields, cardType, deps = {}) {
   }
 
   for (const field of fields) {
-    if (field.type === "image" || field.type === "background") {
+    if (
+      field.type === "image" ||
+      field.type === "background" ||
+      field.type === "pdf"
+    ) {
       const val = data[field.key];
       if (typeof val === "string" && val) {
         data[field.key] = resolveAssetReference(val, ga);

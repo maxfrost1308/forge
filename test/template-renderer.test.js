@@ -9,7 +9,9 @@ import {
 import { hashTagColor } from "../src/color-utils.js";
 
 vi.mock("../src/icon-loader.js", () => ({
-  resolveIconUrl: vi.fn((name) => (name ? `https://example.com/icons/${name}.svg` : null)),
+  resolveIconUrl: vi.fn((name) =>
+    name ? `https://example.com/icons/${name}.svg` : null,
+  ),
   getCachedIcon: vi.fn(() => null),
 }));
 
@@ -61,13 +63,23 @@ describe("preprocessRow", () => {
   });
 
   it("carries forward extra CSV columns not in schema", () => {
-    const result = preprocessRow({ name: "Fern", extra_col: "bonus" }, fields, null);
+    const result = preprocessRow(
+      { name: "Fern", extra_col: "bonus" },
+      fields,
+      null,
+    );
     expect(result.extra_col).toBe("bonus");
   });
 
   it("applies colorMapping from card type", () => {
     const cardType = {
-      colorMapping: { color: { field: "rarity", map: { common: "#aaa", rare: "#gold" }, default: "#fff" } },
+      colorMapping: {
+        color: {
+          field: "rarity",
+          map: { common: "#aaa", rare: "#gold" },
+          default: "#fff",
+        },
+      },
     };
     const result = preprocessRow({ rarity: "rare" }, fields, cardType);
     expect(result.color).toBe("#gold");
@@ -75,7 +87,9 @@ describe("preprocessRow", () => {
 
   it("uses colorMapping default when source value not in map", () => {
     const cardType = {
-      colorMapping: { color: { field: "rarity", map: { common: "#aaa" }, default: "#fff" } },
+      colorMapping: {
+        color: { field: "rarity", map: { common: "#aaa" }, default: "#fff" },
+      },
     };
     const result = preprocessRow({ rarity: "legendary" }, fields, cardType);
     expect(result.color).toBe("#fff");
@@ -85,9 +99,53 @@ describe("preprocessRow", () => {
     const cardType = {
       colorMapping: { color: { field: "rarity", auto: true, default: "#fff" } },
     };
-    const result = preprocessRow({ rarity: "legendary" }, fields, cardType, { hashTagColor });
+    const result = preprocessRow({ rarity: "legendary" }, fields, cardType, {
+      hashTagColor,
+    });
     expect(result.color).toMatch(/^#[0-9a-f]{6}$/i);
     expect(result.color).not.toBe("#fff");
+  });
+
+  describe("pdf field type", () => {
+    it("resolves pdf field via resolveAssetReference when getAsset returns match", () => {
+      const fields = [{ key: "front_pdf", type: "pdf", label: "Front" }];
+      const getAsset = (key) =>
+        key === "cards.pdf#3"
+          ? { data: "data:image/png;base64,abc", type: "image/png", size: 100 }
+          : null;
+      const result = preprocessRow(
+        { front_pdf: "asset:cards.pdf#3" },
+        fields,
+        null,
+        { getAsset },
+      );
+      expect(result.front_pdf).toBe("data:image/png;base64,abc");
+    });
+
+    it("passes through pdf field value when no getAsset match", () => {
+      const fields = [{ key: "front_pdf", type: "pdf", label: "Front" }];
+      const getAsset = () => null;
+      const result = preprocessRow(
+        { front_pdf: "asset:cards.pdf#3" },
+        fields,
+        null,
+        { getAsset },
+      );
+      expect(typeof result.front_pdf).toBe("string");
+    });
+
+    it("pdf field without #N passes through as-is to getAsset", () => {
+      const fields = [{ key: "front_pdf", type: "pdf", label: "Front" }];
+      let capturedKey = null;
+      const getAsset = (key) => {
+        capturedKey = key;
+        return null;
+      };
+      preprocessRow({ front_pdf: "asset:cards.pdf" }, fields, null, {
+        getAsset,
+      });
+      expect(typeof capturedKey).toBe("string");
+    });
   });
 });
 
@@ -98,7 +156,9 @@ describe("renderTemplate", () => {
   });
 
   it("escapes HTML in {{field}} substitution", () => {
-    const result = renderTemplate("{{content}}", { content: '<script>alert("xss")</script>' });
+    const result = renderTemplate("{{content}}", {
+      content: '<script>alert("xss")</script>',
+    });
     expect(result).toBe("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;");
   });
 
@@ -113,7 +173,9 @@ describe("renderTemplate", () => {
   });
 
   it("renders conditional block when truthy", () => {
-    const result = renderTemplate("{{#name}}has name{{/name}}", { name: "Fern" });
+    const result = renderTemplate("{{#name}}has name{{/name}}", {
+      name: "Fern",
+    });
     expect(result).toBe("has name");
   });
 
@@ -123,7 +185,9 @@ describe("renderTemplate", () => {
   });
 
   it("iterates over array with {{#field}}{{.}}{{/field}}", () => {
-    const result = renderTemplate("{{#tags}}<span>{{.}}</span>{{/tags}}", { tags: ["fire", "water"] });
+    const result = renderTemplate("{{#tags}}<span>{{.}}</span>{{/tags}}", {
+      tags: ["fire", "water"],
+    });
     expect(result).toBe("<span>fire</span><span>water</span>");
   });
 
@@ -140,7 +204,9 @@ describe("renderTemplate", () => {
   });
 
   it("renders {{{qr:field}}} as SVG", () => {
-    const result = renderTemplate("{{{qr:url}}}", { url: "https://example.com" });
+    const result = renderTemplate("{{{qr:url}}}", {
+      url: "https://example.com",
+    });
     expect(result).toContain("<svg");
   });
 
@@ -152,58 +218,80 @@ describe("renderTemplate", () => {
 
 describe("{{#eq}} equality conditional", () => {
   it("renders block when field equals expected value", () => {
-    const result = renderTemplate('{{#eq type "creature"}}is creature{{/eq}}', { type: "creature" });
+    const result = renderTemplate('{{#eq type "creature"}}is creature{{/eq}}', {
+      type: "creature",
+    });
     expect(result).toBe("is creature");
   });
 
   it("does not render block when field does not equal expected value", () => {
-    const result = renderTemplate('{{#eq type "creature"}}is creature{{/eq}}', { type: "spell" });
+    const result = renderTemplate('{{#eq type "creature"}}is creature{{/eq}}', {
+      type: "spell",
+    });
     expect(result).toBe("");
   });
 
   it("supports numeric comparison", () => {
-    const result = renderTemplate('{{#eq cost "3"}}costs 3{{/eq}}', { cost: 3 });
+    const result = renderTemplate('{{#eq cost "3"}}costs 3{{/eq}}', {
+      cost: 3,
+    });
     expect(result).toBe("costs 3");
   });
 });
 
 describe("{{#gt}} / {{#lt}} / {{#gte}} / {{#lte}} / {{#neq}} numeric comparisons", () => {
   it("{{#gt}} renders when field > value", () => {
-    const result = renderTemplate("{{#gt attack 5}}ELITE{{/gt}}", { attack: "7" });
+    const result = renderTemplate("{{#gt attack 5}}ELITE{{/gt}}", {
+      attack: "7",
+    });
     expect(result).toBe("ELITE");
   });
 
   it("{{#gt}} does not render when field <= value", () => {
-    const result = renderTemplate("{{#gt attack 5}}ELITE{{/gt}}", { attack: "3" });
+    const result = renderTemplate("{{#gt attack 5}}ELITE{{/gt}}", {
+      attack: "3",
+    });
     expect(result).toBe("");
   });
 
   it("{{#neq}} renders when field does not equal value", () => {
-    const result = renderTemplate('{{#neq type "spell"}}not a spell{{/neq}}', { type: "creature" });
+    const result = renderTemplate('{{#neq type "spell"}}not a spell{{/neq}}', {
+      type: "creature",
+    });
     expect(result).toBe("not a spell");
   });
 });
 
 describe("{{#and}} / {{#or}} / {{#not}} boolean combinators", () => {
   it("{{#and}} renders when both fields are truthy", () => {
-    const result = renderTemplate("{{#and type attack}}combat{{/and}}", { type: "creature", attack: "5" });
+    const result = renderTemplate("{{#and type attack}}combat{{/and}}", {
+      type: "creature",
+      attack: "5",
+    });
     expect(result).toBe("combat");
   });
 
   it("{{#or}} renders when either field is truthy", () => {
-    const result = renderTemplate("{{#or attack defense}}has stats{{/or}}", { attack: "", defense: "3" });
+    const result = renderTemplate("{{#or attack defense}}has stats{{/or}}", {
+      attack: "",
+      defense: "3",
+    });
     expect(result).toBe("has stats");
   });
 
   it("{{#not}} renders when field is falsy", () => {
-    const result = renderTemplate("{{#not attack}}no attack{{/not}}", { attack: "" });
+    const result = renderTemplate("{{#not attack}}no attack{{/not}}", {
+      attack: "",
+    });
     expect(result).toBe("no attack");
   });
 });
 
 describe("String helpers", () => {
   it("{{upper field}} renders UPPERCASE", () => {
-    expect(renderTemplate("{{upper type}}", { type: "creature" })).toBe("CREATURE");
+    expect(renderTemplate("{{upper type}}", { type: "creature" })).toBe(
+      "CREATURE",
+    );
   });
 
   it("{{lower field}} renders lowercase", () => {
@@ -211,11 +299,17 @@ describe("String helpers", () => {
   });
 
   it("{{capitalize field}} capitalizes each word", () => {
-    expect(renderTemplate("{{capitalize name}}", { name: "fire dragon" })).toBe("Fire Dragon");
+    expect(renderTemplate("{{capitalize name}}", { name: "fire dragon" })).toBe(
+      "Fire Dragon",
+    );
   });
 
   it("{{truncate field N}} truncates with ...", () => {
-    expect(renderTemplate("{{truncate desc 10}}", { desc: "A very long description here" })).toBe("A very lon...");
+    expect(
+      renderTemplate("{{truncate desc 10}}", {
+        desc: "A very long description here",
+      }),
+    ).toBe("A very lon...");
   });
 });
 
@@ -226,7 +320,12 @@ describe("renderCard", () => {
   ];
 
   it("preprocesses and renders a full card", () => {
-    const result = renderCard("{{name}}: {{tags}}", { name: "Fern", tags: "plant|green" }, fields, null);
+    const result = renderCard(
+      "{{name}}: {{tags}}",
+      { name: "Fern", tags: "plant|green" },
+      fields,
+      null,
+    );
     expect(result).toBe("Fern: plant, green");
   });
 
@@ -236,20 +335,33 @@ describe("renderCard", () => {
   });
 
   it("injects global variables into rendered output", () => {
-    const result = renderCard("{{name}} - {{$gameName}}", { name: "Fern" }, fields, null, {
-      globalVariables: { gameName: "Dragon Wars" },
-    });
+    const result = renderCard(
+      "{{name}} - {{$gameName}}",
+      { name: "Fern" },
+      fields,
+      null,
+      {
+        globalVariables: { gameName: "Dragon Wars" },
+      },
+    );
     expect(result).toBe("Fern - Dragon Wars");
   });
 });
 
 describe("evaluateExpression", () => {
   it("evaluates simple addition", () => {
-    expect(evaluateExpression("attack + defense", { attack: "3", defense: "5" })).toBe(8);
+    expect(
+      evaluateExpression("attack + defense", { attack: "3", defense: "5" }),
+    ).toBe(8);
   });
 
   it("handles parentheses", () => {
-    expect(evaluateExpression("(attack + defense) * 2", { attack: "3", defense: "5" })).toBe(16);
+    expect(
+      evaluateExpression("(attack + defense) * 2", {
+        attack: "3",
+        defense: "5",
+      }),
+    ).toBe(16);
   });
 
   it("handles division by zero", () => {
