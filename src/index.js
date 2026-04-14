@@ -2,6 +2,7 @@
 
 export {
   renderCard,
+  renderFullCard,
   renderTemplate,
   compileTemplate,
   preprocessRow,

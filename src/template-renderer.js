@@ -35,6 +35,7 @@
 import { resolveIconUrl, getCachedIcon } from "./icon-loader.js";
 import { generateQrSvg } from "./qr-code.js";
 import { injectVariables } from "./global-variables.js";
+import { scopeCss } from "./card-type-registry-core.js";
 
 /** @typedef {Record<string, unknown>} TemplateData */
 /** @typedef {{ id: string, fields: object[], colorMapping?: object|null }} CardType */
@@ -646,6 +647,79 @@ export function preprocessCssAssets(css, getAssetFn = () => null) {
       return _missingAssetPlaceholder(filename);
     },
   );
+}
+
+// ── High-level project rendering ─────────────────────────────────────────────
+
+/**
+ * @typedef {{
+ *   name: string,
+ *   cardTypes: CardType[],
+ *   data: CardRow[],
+ *   globalVariables: Record<string, string>,
+ *   assets: Record<string, AssetEntry>,
+ *   fonts: Record<string, AssetEntry & { family?: string }>
+ * }} ForgeProject
+ */
+
+/**
+ * @typedef {{ side?: 'front' | 'back' }} RenderFullCardOptions
+ */
+
+/**
+ * @typedef {{ html: string, css: string, width: string, height: string, cardTypeId: string }} RenderFullCardResult
+ */
+
+/**
+ * Render a complete card with all CSS ready to inject into the DOM.
+ * Handles font-face injection, CSS asset resolution, and CSS scoping.
+ *
+ * @param {ForgeProject} project
+ * @param {string} cardTypeId
+ * @param {CardRow} row - pass `{}` for back templates
+ * @param {RenderFullCardOptions} [options]
+ * @returns {RenderFullCardResult | null}
+ */
+export function renderFullCard(project, cardTypeId, row, options = {}) {
+  const { side = "front" } = options;
+  const cardType = (project.cardTypes || []).find((ct) => ct.id === cardTypeId);
+  if (!cardType) return null;
+
+  const template =
+    side === "back" ? cardType.backTemplate : cardType.frontTemplate;
+  if (!template) return null;
+
+  const getAsset = (name) =>
+    (project.assets && project.assets[name]) ||
+    (project.fonts && project.fonts[name]) ||
+    null;
+
+  const html = renderCard(template, row, cardType.fields || [], cardType, {
+    globalVariables: project.globalVariables || {},
+    getAsset,
+  });
+
+  let css = "";
+
+  if (project.fonts) {
+    for (const font of Object.values(project.fonts)) {
+      if (font.family && font.data) {
+        css += `@font-face{font-family:"${font.family}";src:url(${font.data})}`;
+      }
+    }
+  }
+
+  if (cardType.css) {
+    css += scopeCss(preprocessCssAssets(cardType.css, getAsset), cardType.id);
+  }
+
+  return {
+    html,
+    css,
+    width: cardType.cardSize ? cardType.cardSize.width : "63.5mm",
+    height: cardType.cardSize ? cardType.cardSize.height : "88.9mm",
+    cardTypeId: cardType.id,
+  };
 }
 
 // ── Computed field expression evaluator ───────────────────────────────────────

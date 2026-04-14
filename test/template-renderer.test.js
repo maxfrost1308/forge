@@ -3,6 +3,7 @@ import {
   preprocessRow,
   renderTemplate,
   renderCard,
+  renderFullCard,
   evaluateExpression,
   validateComputedFields,
 } from "../src/template-renderer.js";
@@ -345,6 +346,114 @@ describe("renderCard", () => {
       },
     );
     expect(result).toBe("Fern - Dragon Wars");
+  });
+});
+
+describe("renderFullCard", () => {
+  const project = {
+    name: "Test Game",
+    cardTypes: [
+      {
+        id: "monsters",
+        name: "Monsters",
+        cardSize: { width: "63.5mm", height: "88.9mm" },
+        fields: [{ key: "name", type: "text" }],
+        frontTemplate: "<div>{{name}}</div>",
+        backTemplate: "<div class='back'>Back</div>",
+        css: ".back { background: red; }",
+      },
+    ],
+    data: [],
+    globalVariables: {},
+    assets: {},
+    fonts: {},
+  };
+
+  it("renders front side by default", () => {
+    const result = renderFullCard(project, "monsters", { name: "Dragon" });
+    expect(result).not.toBeNull();
+    expect(result.html).toBe("<div>Dragon</div>");
+    expect(result.width).toBe("63.5mm");
+    expect(result.height).toBe("88.9mm");
+    expect(result.cardTypeId).toBe("monsters");
+  });
+
+  it("renders back side", () => {
+    const result = renderFullCard(project, "monsters", {}, { side: "back" });
+    expect(result).not.toBeNull();
+    expect(result.html).toContain("Back");
+  });
+
+  it("returns null for unknown card type", () => {
+    expect(renderFullCard(project, "nope", {})).toBeNull();
+  });
+
+  it("returns null when back template is missing", () => {
+    const noBack = {
+      ...project,
+      cardTypes: [{ ...project.cardTypes[0], backTemplate: null }],
+    };
+    expect(renderFullCard(noBack, "monsters", {}, { side: "back" })).toBeNull();
+  });
+
+  it("scopes CSS with data-card-type selector", () => {
+    const result = renderFullCard(project, "monsters", { name: "X" });
+    expect(result.css).toContain('[data-card-type="monsters"]');
+  });
+
+  it("injects @font-face rules from project.fonts", () => {
+    const withFonts = {
+      ...project,
+      fonts: {
+        "custom.woff2": {
+          data: "data:font/woff2;base64,abc",
+          type: "font/woff2",
+          family: "CustomFont",
+        },
+      },
+    };
+    const result = renderFullCard(withFonts, "monsters", { name: "X" });
+    expect(result.css).toContain('@font-face{font-family:"CustomFont"');
+    expect(result.css).toContain("data:font/woff2;base64,abc");
+  });
+
+  it("resolves {{{asset:...}}} in CSS", () => {
+    const withAsset = {
+      ...project,
+      assets: {
+        "bg.png": { data: "data:image/png;base64,xyz", type: "image/png" },
+      },
+      cardTypes: [
+        {
+          ...project.cardTypes[0],
+          css: ".card { background: url({{{asset:bg.png}}}); }",
+        },
+      ],
+    };
+    const result = renderFullCard(withAsset, "monsters", { name: "X" });
+    expect(result.css).toContain("data:image/png;base64,xyz");
+    expect(result.css).not.toContain("{{{asset:");
+  });
+
+  it("resolves fonts via getAsset fallback", () => {
+    const withFontAsset = {
+      ...project,
+      fonts: {
+        "my.woff2": {
+          data: "data:font/woff2;base64,fontdata",
+          type: "font/woff2",
+          family: "MyFont",
+        },
+      },
+      cardTypes: [
+        {
+          ...project.cardTypes[0],
+          css: ".card { src: url({{{asset:my.woff2}}}); }",
+        },
+      ],
+    };
+    const result = renderFullCard(withFontAsset, "monsters", { name: "X" });
+    expect(result.css).toContain("data:font/woff2;base64,fontdata");
   });
 });
 
