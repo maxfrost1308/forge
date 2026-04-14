@@ -4,6 +4,7 @@ import {
   renderTemplate,
   renderCard,
   renderFullCard,
+  buildFontFaceCss,
   evaluateExpression,
   validateComputedFields,
 } from "../src/template-renderer.js";
@@ -401,7 +402,7 @@ describe("renderFullCard", () => {
     expect(result.css).toContain('[data-card-type="monsters"]');
   });
 
-  it("injects @font-face rules from project.fonts", () => {
+  it("injects @font-face rules with format hint from project.fonts", () => {
     const withFonts = {
       ...project,
       fonts: {
@@ -414,7 +415,24 @@ describe("renderFullCard", () => {
     };
     const result = renderFullCard(withFonts, "monsters", { name: "X" });
     expect(result.css).toContain('@font-face{font-family:"CustomFont"');
+    expect(result.css).toContain("format('woff2')");
     expect(result.css).toContain("data:font/woff2;base64,abc");
+  });
+
+  it("escapes font family names in CSS", () => {
+    const withFonts = {
+      ...project,
+      fonts: {
+        "weird.ttf": {
+          data: "data:font/ttf;base64,x",
+          type: "font/ttf",
+          family: 'My "Fancy" Font',
+        },
+      },
+    };
+    const result = renderFullCard(withFonts, "monsters", { name: "X" });
+    expect(result.css).toContain('My \\"Fancy\\" Font');
+    expect(result.css).toContain("format('truetype')");
   });
 
   it("resolves {{{asset:...}}} in CSS", () => {
@@ -454,6 +472,38 @@ describe("renderFullCard", () => {
     };
     const result = renderFullCard(withFontAsset, "monsters", { name: "X" });
     expect(result.css).toContain("data:font/woff2;base64,fontdata");
+  });
+});
+
+describe("buildFontFaceCss", () => {
+  it("returns empty string for null/empty fonts", () => {
+    expect(buildFontFaceCss(null)).toBe("");
+    expect(buildFontFaceCss({})).toBe("");
+  });
+
+  it("detects woff2 format", () => {
+    const css = buildFontFaceCss({ "f.woff2": { data: "d", family: "F" } });
+    expect(css).toContain("format('woff2')");
+  });
+
+  it("detects opentype format for otf", () => {
+    const css = buildFontFaceCss({ "f.otf": { data: "d", family: "F" } });
+    expect(css).toContain("format('opentype')");
+  });
+
+  it("defaults to truetype for ttf", () => {
+    const css = buildFontFaceCss({ "f.ttf": { data: "d", family: "F" } });
+    expect(css).toContain("format('truetype')");
+  });
+
+  it("skips fonts without family or data", () => {
+    const css = buildFontFaceCss({
+      "a.ttf": { data: "d", family: "" },
+      "b.ttf": { data: "", family: "B" },
+      "c.ttf": { data: "d", family: "C" },
+    });
+    expect(css).not.toContain("font-family:\"\"");
+    expect(css).toContain('"C"');
   });
 });
 

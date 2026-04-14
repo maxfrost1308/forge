@@ -3,6 +3,7 @@
 export {
   renderCard,
   renderFullCard,
+  buildFontFaceCss,
   renderTemplate,
   compileTemplate,
   preprocessRow,

@@ -650,6 +650,8 @@ export function preprocessCssAssets(css, getAssetFn = () => null) {
 }
 
 // ── High-level project rendering ─────────────────────────────────────────────
+// Extracted from card-maker: font-manager.js (detectFontFormat, _escapeCssFontName)
+// and print-layout-builder.js (buildFontFaceCss).
 
 /**
  * @typedef {{
@@ -669,6 +671,43 @@ export function preprocessCssAssets(css, getAssetFn = () => null) {
 /**
  * @typedef {{ html: string, css: string, width: string, height: string, cardTypeId: string }} RenderFullCardResult
  */
+
+/** @param {string} filename */
+function _detectFontFormat(filename) {
+  const ext = (filename || "").toLowerCase().split(".").pop();
+  switch (ext) {
+    case "otf":
+      return "opentype";
+    case "woff":
+      return "woff";
+    case "woff2":
+      return "woff2";
+    default:
+      return "truetype";
+  }
+}
+
+/** @param {string} name */
+function _escapeCssFontName(name) {
+  return name.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+/**
+ * @param {Record<string, AssetEntry & { family?: string }>} fonts
+ * @returns {string}
+ */
+export function buildFontFaceCss(fonts) {
+  if (!fonts) return "";
+  const entries = Object.entries(fonts);
+  if (entries.length === 0) return "";
+  return entries
+    .filter(([, f]) => f.family && f.data)
+    .map(
+      ([filename, f]) =>
+        `@font-face{font-family:"${_escapeCssFontName(f.family)}";src:url(${f.data}) format('${_detectFontFormat(filename)}');font-display:swap}`,
+    )
+    .join("");
+}
 
 /**
  * Render a complete card with all CSS ready to inject into the DOM.
@@ -699,15 +738,7 @@ export function renderFullCard(project, cardTypeId, row, options = {}) {
     getAsset,
   });
 
-  let css = "";
-
-  if (project.fonts) {
-    for (const font of Object.values(project.fonts)) {
-      if (font.family && font.data) {
-        css += `@font-face{font-family:"${font.family}";src:url(${font.data})}`;
-      }
-    }
-  }
+  let css = buildFontFaceCss(project.fonts);
 
   if (cardType.css) {
     css += scopeCss(preprocessCssAssets(cardType.css, getAsset), cardType.id);
