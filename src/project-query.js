@@ -16,8 +16,8 @@ export function getCardTypes(project) {
 
 /**
  * Returns rows from project.data that belong to the given card type.
- * For single-type projects (rows have no _cardType field), returns all rows.
- * For multi-type projects (rows have _cardType field), filters by cardTypeId.
+ * For single-type projects (rows have no _type field), returns all rows.
+ * For multi-type projects (rows have _type field), filters by cardTypeId.
  *
  * @param {object} project
  * @param {string} cardTypeId
@@ -26,9 +26,9 @@ export function getCardTypes(project) {
 export function getCardsByType(project, cardTypeId) {
   const rows = (project && project.data) || [];
   if (rows.length === 0) return [];
-  const hasTypeField = rows.some((r) => "_cardType" in r);
+  const hasTypeField = rows.some((r) => "_type" in r);
   if (!hasTypeField) return rows.slice();
-  return rows.filter((r) => r._cardType === cardTypeId);
+  return rows.filter((r) => r._type === cardTypeId);
 }
 
 /**

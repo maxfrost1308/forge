@@ -25,10 +25,10 @@ const multiTypeProject = {
     { id: "spells", name: "Spells" },
   ],
   data: [
-    { _cardType: "monsters", name: "Dragon" },
-    { _cardType: "spells", name: "Fireball" },
-    { _cardType: "monsters", name: "Goblin" },
-    { _cardType: "spells", name: "Ice Storm" },
+    { _type: "monsters", name: "Dragon" },
+    { _type: "spells", name: "Fireball" },
+    { _type: "monsters", name: "Goblin" },
+    { _type: "spells", name: "Ice Storm" },
   ],
 };
 
@@ -59,11 +59,11 @@ describe("getCardsByType", () => {
   it("filters rows by _cardType for multi-type project", () => {
     const monsters = getCardsByType(multiTypeProject, "monsters");
     expect(monsters).toHaveLength(2);
-    expect(monsters.every((r) => r._cardType === "monsters")).toBe(true);
+    expect(monsters.every((r) => r._type === "monsters")).toBe(true);
 
     const spells = getCardsByType(multiTypeProject, "spells");
     expect(spells).toHaveLength(2);
-    expect(spells.every((r) => r._cardType === "spells")).toBe(true);
+    expect(spells.every((r) => r._type === "spells")).toBe(true);
   });
 
   it("returns empty array for unknown cardTypeId in multi-type project", () => {
@@ -76,6 +76,48 @@ describe("getCardsByType", () => {
 
   it("returns empty array for empty project", () => {
     expect(getCardsByType({}, "x")).toEqual([]);
+  });
+
+  it("filters by _type as set by deserializeProject (regression: not _cardType)", () => {
+    // deserializeProject (project-format.js) stamps each row with _type = typeId.
+    // This test ensures getCardsByType and getProjectSummary use that field,
+    // not any other variant (e.g. _cardType), preventing silent field-name mismatches.
+    const deserialized = {
+      name: "Deserialized Project",
+      cardTypes: [
+        { id: "deck", name: "Deck Cards" },
+        { id: "token", name: "Tokens" },
+      ],
+      data: [
+        { _type: "deck", name: "Ace of Spades", suit: "spades" },
+        { _type: "deck", name: "King of Hearts", suit: "hearts" },
+        { _type: "token", name: "Gold Coin", value: "1" },
+        { _type: "deck", name: "Queen of Diamonds", suit: "diamonds" },
+        { _type: "token", name: "Silver Coin", value: "5" },
+      ],
+    };
+
+    const deckCards = getCardsByType(deserialized, "deck");
+    expect(deckCards).toHaveLength(3);
+    expect(deckCards.map((r) => r.name)).toEqual([
+      "Ace of Spades",
+      "King of Hearts",
+      "Queen of Diamonds",
+    ]);
+
+    const tokens = getCardsByType(deserialized, "token");
+    expect(tokens).toHaveLength(2);
+    expect(tokens.map((r) => r.name)).toEqual(["Gold Coin", "Silver Coin"]);
+
+    expect(getCardsByType(deserialized, "nonexistent")).toEqual([]);
+
+    const summary = getProjectSummary(deserialized);
+    expect(summary.cardTypeCount).toBe(2);
+    expect(summary.totalCards).toBe(5);
+    expect(summary.cardTypes).toEqual([
+      { id: "deck", name: "Deck Cards", count: 3 },
+      { id: "token", name: "Tokens", count: 2 },
+    ]);
   });
 
   it("does not mutate the original data array", () => {
