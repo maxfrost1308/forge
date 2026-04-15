@@ -473,6 +473,33 @@ describe("renderFullCard", () => {
     const result = renderFullCard(withFontAsset, "monsters", { name: "X" });
     expect(result.css).toContain("data:font/woff2;base64,fontdata");
   });
+
+  it("passes hashTagColor so auto-color colorMapping produces non-empty values", () => {
+    const withAutoColor = {
+      ...project,
+      cardTypes: [
+        {
+          ...project.cardTypes[0],
+          frontTemplate: "<div style='color:{{borderColor}}'>{{name}}</div>",
+          fields: [
+            { key: "name", type: "text" },
+            { key: "type", type: "text" },
+          ],
+          colorMapping: {
+            borderColor: { field: "type", auto: true },
+          },
+        },
+      ],
+    };
+    const result = renderFullCard(withAutoColor, "monsters", {
+      name: "Dragon",
+      type: "fire",
+    });
+    expect(result).not.toBeNull();
+    const expectedColor = hashTagColor("fire");
+    expect(expectedColor).toBeTruthy();
+    expect(result.html).toContain(expectedColor);
+  });
 });
 
 describe("buildFontFaceCss", () => {
@@ -502,7 +529,7 @@ describe("buildFontFaceCss", () => {
       "b.ttf": { data: "", family: "B" },
       "c.ttf": { data: "d", family: "C" },
     });
-    expect(css).not.toContain("font-family:\"\"");
+    expect(css).not.toContain('font-family:""');
     expect(css).toContain('"C"');
   });
 });

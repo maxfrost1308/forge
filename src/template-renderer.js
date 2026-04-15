@@ -36,6 +36,7 @@ import { resolveIconUrl, getCachedIcon } from "./icon-loader.js";
 import { generateQrSvg } from "./qr-code.js";
 import { injectVariables } from "./global-variables.js";
 import { scopeCss } from "./card-type-registry-core.js";
+import { hashTagColor } from "./color-utils.js";
 
 /** @typedef {Record<string, unknown>} TemplateData */
 /** @typedef {{ id: string, fields: object[], colorMapping?: object|null }} CardType */
@@ -736,6 +737,7 @@ export function renderFullCard(project, cardTypeId, row, options = {}) {
   const html = renderCard(template, row, cardType.fields || [], cardType, {
     globalVariables: project.globalVariables || {},
     getAsset,
+    hashTagColor,
   });
 
   let css = buildFontFaceCss(project.fonts);
