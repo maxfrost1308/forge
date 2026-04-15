@@ -746,6 +746,12 @@ export function renderFullCard(project, cardTypeId, row, options = {}) {
     css += scopeCss(preprocessCssAssets(cardType.css, getAsset), cardType.id);
   }
 
+  const colorVars = getAutoColorVars(row, cardType, hashTagColor);
+  const colorEntries = Object.entries(colorVars);
+  if (colorEntries.length > 0) {
+    css += `[data-card-type="${cardType.id}"]{${colorEntries.map(([k, v]) => `${k}:${v}`).join(";")}}`;
+  }
+
   return {
     html,
     css,

@@ -502,6 +502,69 @@ describe("renderFullCard", () => {
     expect(expectedColor).toBeTruthy();
     expect(result.html).toContain(expectedColor);
   });
+
+  it("injects --cm-* CSS custom properties from colorMapping into css output", () => {
+    const withColorVars = {
+      ...project,
+      cardTypes: [
+        {
+          ...project.cardTypes[0],
+          fields: [
+            { key: "name", type: "text" },
+            { key: "category", type: "text" },
+          ],
+          css: ".border { border-color: var(--cm-borderColor); }",
+          colorMapping: {
+            borderColor: {
+              field: "category",
+              map: { fire: "#ff0000", water: "#0000ff" },
+              default: "#cccccc",
+            },
+          },
+        },
+      ],
+    };
+    const result = renderFullCard(withColorVars, "monsters", {
+      name: "Dragon",
+      category: "fire",
+    });
+    expect(result).not.toBeNull();
+    expect(result.css).toContain("--cm-borderColor");
+    expect(result.css).toContain("#ff0000");
+    expect(result.css).toContain('[data-card-type="monsters"]');
+  });
+
+  it("injects --cm-* CSS vars for auto-color mappings", () => {
+    const withAutoColorVars = {
+      ...project,
+      cardTypes: [
+        {
+          ...project.cardTypes[0],
+          fields: [
+            { key: "name", type: "text" },
+            { key: "element", type: "text" },
+          ],
+          css: ".card { background: var(--cm-bg); }",
+          colorMapping: {
+            bg: { field: "element", auto: true },
+          },
+        },
+      ],
+    };
+    const result = renderFullCard(withAutoColorVars, "monsters", {
+      name: "Dragon",
+      element: "lightning",
+    });
+    expect(result).not.toBeNull();
+    expect(result.css).toContain("--cm-bg");
+    const expectedColor = hashTagColor("lightning");
+    expect(result.css).toContain(expectedColor);
+  });
+
+  it("does not inject color vars block when no colorMapping exists", () => {
+    const result = renderFullCard(project, "monsters", { name: "Dragon" });
+    expect(result.css).not.toContain("--cm-");
+  });
 });
 
 describe("buildFontFaceCss", () => {
