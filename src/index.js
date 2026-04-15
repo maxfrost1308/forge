@@ -13,6 +13,8 @@ export {
   preprocessCssAssets,
   evaluateExpression,
   validateComputedFields,
+  detectFontFormat,
+  escapeCssFontName,
 } from "./template-renderer.js";
 
 export { generateQrSvg } from "./qr-code.js";

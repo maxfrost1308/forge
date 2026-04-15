@@ -674,7 +674,7 @@ export function preprocessCssAssets(css, getAssetFn = () => null) {
  */
 
 /** @param {string} filename */
-function _detectFontFormat(filename) {
+export function detectFontFormat(filename) {
   const ext = (filename || "").toLowerCase().split(".").pop();
   switch (ext) {
     case "otf":
@@ -689,7 +689,7 @@ function _detectFontFormat(filename) {
 }
 
 /** @param {string} name */
-function _escapeCssFontName(name) {
+export function escapeCssFontName(name) {
   return name.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
@@ -705,7 +705,7 @@ export function buildFontFaceCss(fonts) {
     .filter(([, f]) => f.family && f.data)
     .map(
       ([filename, f]) =>
-        `@font-face{font-family:"${_escapeCssFontName(f.family)}";src:url(${f.data}) format('${_detectFontFormat(filename)}');font-display:swap}`,
+        `@font-face{font-family:"${escapeCssFontName(f.family)}";src:url(${f.data}) format('${detectFontFormat(filename)}');font-display:swap}`,
     )
     .join("");
 }

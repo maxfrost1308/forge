@@ -7,6 +7,8 @@ import {
   buildFontFaceCss,
   evaluateExpression,
   validateComputedFields,
+  detectFontFormat,
+  escapeCssFontName,
 } from "../src/template-renderer.js";
 import { hashTagColor } from "../src/color-utils.js";
 
@@ -572,5 +574,46 @@ describe("validateComputedFields", () => {
     ];
     const errors = validateComputedFields(fields);
     expect(errors.length).toBeGreaterThan(0);
+  });
+});
+
+describe("detectFontFormat", () => {
+  it("returns truetype for ttf", () => {
+    expect(detectFontFormat("font.ttf")).toBe("truetype");
+  });
+
+  it("returns opentype for otf", () => {
+    expect(detectFontFormat("font.otf")).toBe("opentype");
+  });
+
+  it("returns woff for woff", () => {
+    expect(detectFontFormat("font.woff")).toBe("woff");
+  });
+
+  it("returns woff2 for woff2", () => {
+    expect(detectFontFormat("font.woff2")).toBe("woff2");
+  });
+
+  it("defaults to truetype for unknown extension", () => {
+    expect(detectFontFormat("font.xyz")).toBe("truetype");
+  });
+
+  it("handles empty/null filename", () => {
+    expect(detectFontFormat("")).toBe("truetype");
+    expect(detectFontFormat(null)).toBe("truetype");
+  });
+});
+
+describe("escapeCssFontName", () => {
+  it("escapes double quotes", () => {
+    expect(escapeCssFontName('My "Font"')).toBe('My \\"Font\\"');
+  });
+
+  it("escapes backslashes", () => {
+    expect(escapeCssFontName("Back\\slash")).toBe("Back\\\\slash");
+  });
+
+  it("leaves plain names unchanged", () => {
+    expect(escapeCssFontName("MyFont")).toBe("MyFont");
   });
 });
