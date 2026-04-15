@@ -37,6 +37,7 @@ import { generateQrSvg } from "./qr-code.js";
 import { injectVariables } from "./global-variables.js";
 import { scopeCss } from "./card-type-registry-core.js";
 import { hashTagColor } from "./color-utils.js";
+import { getCardsByType } from "./project-query.js";
 
 /** @typedef {Record<string, unknown>} TemplateData */
 /** @typedef {{ id: string, fields: object[], colorMapping?: object|null }} CardType */
@@ -716,7 +717,9 @@ export function buildFontFaceCss(fonts) {
  *
  * @param {ForgeProject} project
  * @param {string} cardTypeId
- * @param {CardRow} row - pass `{}` for back templates
+ * @param {CardRow} row - row data for template rendering. When `side` is
+ *   `'back'` and `row` is empty (`{}`), the first matching row for the card
+ *   type is automatically used from `project.data`.
  * @param {RenderFullCardOptions} [options]
  * @returns {RenderFullCardResult | null}
  */
@@ -729,16 +732,33 @@ export function renderFullCard(project, cardTypeId, row, options = {}) {
     side === "back" ? cardType.backTemplate : cardType.frontTemplate;
   if (!template) return null;
 
+  // Auto-resolve row data for back-side rendering: if the caller passed an
+  // empty row, use the first data row for this card type so that back
+  // templates referencing row fields (e.g. {{back_image}}) render real data.
+  let resolvedRow = row;
+  if (side === "back" && Object.keys(row).length === 0) {
+    const rows = getCardsByType(project, cardTypeId);
+    if (rows.length > 0) {
+      resolvedRow = rows[0];
+    }
+  }
+
   const getAsset = (name) =>
     (project.assets && project.assets[name]) ||
     (project.fonts && project.fonts[name]) ||
     null;
 
-  const html = renderCard(template, row, cardType.fields || [], cardType, {
-    globalVariables: project.globalVariables || {},
-    getAsset,
-    hashTagColor,
-  });
+  const html = renderCard(
+    template,
+    resolvedRow,
+    cardType.fields || [],
+    cardType,
+    {
+      globalVariables: project.globalVariables || {},
+      getAsset,
+      hashTagColor,
+    },
+  );
 
   let css = buildFontFaceCss(project.fonts);
 
@@ -746,7 +766,7 @@ export function renderFullCard(project, cardTypeId, row, options = {}) {
     css += scopeCss(preprocessCssAssets(cardType.css, getAsset), cardType.id);
   }
 
-  const colorVars = getAutoColorVars(row, cardType, hashTagColor);
+  const colorVars = getAutoColorVars(resolvedRow, cardType, hashTagColor);
   const colorEntries = Object.entries(colorVars);
   if (colorEntries.length > 0) {
     css += `[data-card-type="${cardType.id}"]{${colorEntries.map(([k, v]) => `${k}:${v}`).join(";")}}`;

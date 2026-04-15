@@ -565,6 +565,49 @@ describe("renderFullCard", () => {
     const result = renderFullCard(project, "monsters", { name: "Dragon" });
     expect(result.css).not.toContain("--cm-");
   });
+
+  it("auto-resolves row from project data when back side gets empty row", () => {
+    const withData = {
+      ...project,
+      cardTypes: [
+        {
+          ...project.cardTypes[0],
+          backTemplate: '<div class="back"><img src="{{back_image}}" /></div>',
+        },
+      ],
+      data: [{ name: "Dragon", back_image: "data:image/png;base64,abc123" }],
+    };
+    const result = renderFullCard(withData, "monsters", {}, { side: "back" });
+    expect(result).not.toBeNull();
+    expect(result.html).toContain("data:image/png;base64,abc123");
+    expect(result.html).not.toContain("{{back_image}}");
+  });
+
+  it("keeps empty row when no project data exists for card type", () => {
+    const result = renderFullCard(project, "monsters", {}, { side: "back" });
+    expect(result).not.toBeNull();
+    expect(result.html).toContain("Back");
+  });
+
+  it("does not override a non-empty row on back side", () => {
+    const withData = {
+      ...project,
+      cardTypes: [
+        {
+          ...project.cardTypes[0],
+          backTemplate: "<div>{{name}}</div>",
+        },
+      ],
+      data: [{ name: "FromData" }],
+    };
+    const result = renderFullCard(
+      withData,
+      "monsters",
+      { name: "Explicit" },
+      { side: "back" },
+    );
+    expect(result.html).toBe("<div>Explicit</div>");
+  });
 });
 
 describe("buildFontFaceCss", () => {
