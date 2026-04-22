@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { serializeProject, deserializeProject } from "../src/project-format.js";
 
-function blobToArrayBuffer(blob) {
+function blobToArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result);
+    reader.onloadend = () => resolve(reader.result as ArrayBuffer);
     reader.onerror = reject;
     reader.readAsArrayBuffer(blob);
   });

@@ -59,11 +59,11 @@ describe("getCardsByType", () => {
   it("filters rows by _cardType for multi-type project", () => {
     const monsters = getCardsByType(multiTypeProject, "monsters");
     expect(monsters).toHaveLength(2);
-    expect(monsters.every((r) => r._type === "monsters")).toBe(true);
+    expect(monsters.every((r: Record<string, unknown>) => r._type === "monsters")).toBe(true);
 
     const spells = getCardsByType(multiTypeProject, "spells");
     expect(spells).toHaveLength(2);
-    expect(spells.every((r) => r._type === "spells")).toBe(true);
+    expect(spells.every((r: Record<string, unknown>) => r._type === "spells")).toBe(true);
   });
 
   it("returns empty array for unknown cardTypeId in multi-type project", () => {
@@ -79,9 +79,6 @@ describe("getCardsByType", () => {
   });
 
   it("filters by _type as set by deserializeProject (regression: not _cardType)", () => {
-    // deserializeProject (project-format.js) stamps each row with _type = typeId.
-    // This test ensures getCardsByType and getProjectSummary use that field,
-    // not any other variant (e.g. _cardType), preventing silent field-name mismatches.
     const deserialized = {
       name: "Deserialized Project",
       cardTypes: [
@@ -99,7 +96,7 @@ describe("getCardsByType", () => {
 
     const deckCards = getCardsByType(deserialized, "deck");
     expect(deckCards).toHaveLength(3);
-    expect(deckCards.map((r) => r.name)).toEqual([
+    expect(deckCards.map((r: Record<string, unknown>) => r.name)).toEqual([
       "Ace of Spades",
       "King of Hearts",
       "Queen of Diamonds",
@@ -107,7 +104,7 @@ describe("getCardsByType", () => {
 
     const tokens = getCardsByType(deserialized, "token");
     expect(tokens).toHaveLength(2);
-    expect(tokens.map((r) => r.name)).toEqual(["Gold Coin", "Silver Coin"]);
+    expect(tokens.map((r: Record<string, unknown>) => r.name)).toEqual(["Gold Coin", "Silver Coin"]);
 
     expect(getCardsByType(deserialized, "nonexistent")).toEqual([]);
 
@@ -157,22 +154,22 @@ describe("sortCards", () => {
 
   it("sorts strings ascending", () => {
     const sorted = sortCards(rows, "name");
-    expect(sorted.map((r) => r.name)).toEqual(["Dragon", "Goblin", "Troll"]);
+    expect(sorted.map((r: Record<string, unknown>) => r.name)).toEqual(["Dragon", "Goblin", "Troll"]);
   });
 
   it("sorts strings descending", () => {
     const sorted = sortCards(rows, "name", "desc");
-    expect(sorted.map((r) => r.name)).toEqual(["Troll", "Goblin", "Dragon"]);
+    expect(sorted.map((r: Record<string, unknown>) => r.name)).toEqual(["Troll", "Goblin", "Dragon"]);
   });
 
   it("sorts numeric strings numerically (not lexicographically)", () => {
     const sorted = sortCards(rows, "power");
-    expect(sorted.map((r) => r.power)).toEqual(["2", "5", "10"]);
+    expect(sorted.map((r: Record<string, unknown>) => r.power)).toEqual(["2", "5", "10"]);
   });
 
   it("sorts numeric strings descending", () => {
     const sorted = sortCards(rows, "power", "desc");
-    expect(sorted.map((r) => r.power)).toEqual(["10", "5", "2"]);
+    expect(sorted.map((r: Record<string, unknown>) => r.power)).toEqual(["10", "5", "2"]);
   });
 
   it("does not mutate the input array", () => {
@@ -202,8 +199,8 @@ describe("getProjectSummary", () => {
     const summary = getProjectSummary(multiTypeProject);
     expect(summary.cardTypeCount).toBe(2);
     expect(summary.totalCards).toBe(4);
-    const monsterEntry = summary.cardTypes.find((ct) => ct.id === "monsters");
-    const spellEntry = summary.cardTypes.find((ct) => ct.id === "spells");
+    const monsterEntry = summary.cardTypes.find((ct: Record<string, unknown>) => ct.id === "monsters");
+    const spellEntry = summary.cardTypes.find((ct: Record<string, unknown>) => ct.id === "spells");
     expect(monsterEntry.count).toBe(2);
     expect(spellEntry.count).toBe(2);
   });

@@ -13,14 +13,14 @@ import {
 import { hashTagColor } from "../src/color-utils.js";
 
 vi.mock("../src/icon-loader.js", () => ({
-  resolveIconUrl: vi.fn((name) =>
+  resolveIconUrl: vi.fn((name: string) =>
     name ? `https://example.com/icons/${name}.svg` : null,
   ),
   getCachedIcon: vi.fn(() => null),
 }));
 
 vi.mock("../src/qr-code.js", () => ({
-  generateQrSvg: vi.fn((val) => `<svg data-qr="${val}"></svg>`),
+  generateQrSvg: vi.fn((val: string) => `<svg data-qr="${val}"></svg>`),
 }));
 
 describe("preprocessRow", () => {
@@ -113,7 +113,7 @@ describe("preprocessRow", () => {
   describe("pdf field type", () => {
     it("resolves pdf field via resolveAssetReference when getAsset returns match", () => {
       const fields = [{ key: "front_pdf", type: "pdf", label: "Front" }];
-      const getAsset = (key) =>
+      const getAsset = (key: string) =>
         key === "cards.pdf#3"
           ? { data: "data:image/png;base64,abc", type: "image/png", size: 100 }
           : null;
@@ -140,8 +140,8 @@ describe("preprocessRow", () => {
 
     it("pdf field without #N passes through as-is to getAsset", () => {
       const fields = [{ key: "front_pdf", type: "pdf", label: "Front" }];
-      let capturedKey = null;
-      const getAsset = (key) => {
+      let capturedKey: string | null = null;
+      const getAsset = (key: string) => {
         capturedKey = key;
         return null;
       };
@@ -375,16 +375,16 @@ describe("renderFullCard", () => {
   it("renders front side by default", () => {
     const result = renderFullCard(project, "monsters", { name: "Dragon" });
     expect(result).not.toBeNull();
-    expect(result.html).toBe("<div>Dragon</div>");
-    expect(result.width).toBe("63.5mm");
-    expect(result.height).toBe("88.9mm");
-    expect(result.cardTypeId).toBe("monsters");
+    expect(result!.html).toBe("<div>Dragon</div>");
+    expect(result!.width).toBe("63.5mm");
+    expect(result!.height).toBe("88.9mm");
+    expect(result!.cardTypeId).toBe("monsters");
   });
 
   it("renders back side", () => {
     const result = renderFullCard(project, "monsters", {}, { side: "back" });
     expect(result).not.toBeNull();
-    expect(result.html).toContain("Back");
+    expect(result!.html).toContain("Back");
   });
 
   it("returns null for unknown card type", () => {
@@ -401,7 +401,7 @@ describe("renderFullCard", () => {
 
   it("scopes CSS with data-card-type selector", () => {
     const result = renderFullCard(project, "monsters", { name: "X" });
-    expect(result.css).toContain('[data-card-type="monsters"]');
+    expect(result!.css).toContain('[data-card-type="monsters"]');
   });
 
   it("injects @font-face rules with format hint from project.fonts", () => {
@@ -416,9 +416,9 @@ describe("renderFullCard", () => {
       },
     };
     const result = renderFullCard(withFonts, "monsters", { name: "X" });
-    expect(result.css).toContain('@font-face{font-family:"CustomFont"');
-    expect(result.css).toContain("format('woff2')");
-    expect(result.css).toContain("data:font/woff2;base64,abc");
+    expect(result!.css).toContain('@font-face{font-family:"CustomFont"');
+    expect(result!.css).toContain("format('woff2')");
+    expect(result!.css).toContain("data:font/woff2;base64,abc");
   });
 
   it("escapes font family names in CSS", () => {
@@ -433,8 +433,8 @@ describe("renderFullCard", () => {
       },
     };
     const result = renderFullCard(withFonts, "monsters", { name: "X" });
-    expect(result.css).toContain('My \\"Fancy\\" Font');
-    expect(result.css).toContain("format('truetype')");
+    expect(result!.css).toContain('My \\"Fancy\\" Font');
+    expect(result!.css).toContain("format('truetype')");
   });
 
   it("resolves {{{asset:...}}} in CSS", () => {
@@ -451,8 +451,8 @@ describe("renderFullCard", () => {
       ],
     };
     const result = renderFullCard(withAsset, "monsters", { name: "X" });
-    expect(result.css).toContain("data:image/png;base64,xyz");
-    expect(result.css).not.toContain("{{{asset:");
+    expect(result!.css).toContain("data:image/png;base64,xyz");
+    expect(result!.css).not.toContain("{{{asset:");
   });
 
   it("resolves fonts via getAsset fallback", () => {
@@ -473,7 +473,7 @@ describe("renderFullCard", () => {
       ],
     };
     const result = renderFullCard(withFontAsset, "monsters", { name: "X" });
-    expect(result.css).toContain("data:font/woff2;base64,fontdata");
+    expect(result!.css).toContain("data:font/woff2;base64,fontdata");
   });
 
   it("passes hashTagColor so auto-color colorMapping produces non-empty values", () => {
@@ -500,7 +500,7 @@ describe("renderFullCard", () => {
     expect(result).not.toBeNull();
     const expectedColor = hashTagColor("fire");
     expect(expectedColor).toBeTruthy();
-    expect(result.html).toContain(expectedColor);
+    expect(result!.html).toContain(expectedColor);
   });
 
   it("injects --cm-* CSS custom properties from colorMapping into css output", () => {
@@ -529,9 +529,9 @@ describe("renderFullCard", () => {
       category: "fire",
     });
     expect(result).not.toBeNull();
-    expect(result.css).toContain("--cm-borderColor");
-    expect(result.css).toContain("#ff0000");
-    expect(result.css).toContain('[data-card-type="monsters"]');
+    expect(result!.css).toContain("--cm-borderColor");
+    expect(result!.css).toContain("#ff0000");
+    expect(result!.css).toContain('[data-card-type="monsters"]');
   });
 
   it("injects --cm-* CSS vars for auto-color mappings", () => {
@@ -556,14 +556,14 @@ describe("renderFullCard", () => {
       element: "lightning",
     });
     expect(result).not.toBeNull();
-    expect(result.css).toContain("--cm-bg");
+    expect(result!.css).toContain("--cm-bg");
     const expectedColor = hashTagColor("lightning");
-    expect(result.css).toContain(expectedColor);
+    expect(result!.css).toContain(expectedColor);
   });
 
   it("does not inject color vars block when no colorMapping exists", () => {
     const result = renderFullCard(project, "monsters", { name: "Dragon" });
-    expect(result.css).not.toContain("--cm-");
+    expect(result!.css).not.toContain("--cm-");
   });
 
   it("auto-resolves row from project data when back side gets empty row", () => {
@@ -579,14 +579,14 @@ describe("renderFullCard", () => {
     };
     const result = renderFullCard(withData, "monsters", {}, { side: "back" });
     expect(result).not.toBeNull();
-    expect(result.html).toContain("data:image/png;base64,abc123");
-    expect(result.html).not.toContain("{{back_image}}");
+    expect(result!.html).toContain("data:image/png;base64,abc123");
+    expect(result!.html).not.toContain("{{back_image}}");
   });
 
   it("keeps empty row when no project data exists for card type", () => {
     const result = renderFullCard(project, "monsters", {}, { side: "back" });
     expect(result).not.toBeNull();
-    expect(result.html).toContain("Back");
+    expect(result!.html).toContain("Back");
   });
 
   it("does not override a non-empty row on back side", () => {
@@ -606,13 +606,13 @@ describe("renderFullCard", () => {
       { name: "Explicit" },
       { side: "back" },
     );
-    expect(result.html).toBe("<div>Explicit</div>");
+    expect(result!.html).toBe("<div>Explicit</div>");
   });
 });
 
 describe("buildFontFaceCss", () => {
   it("returns empty string for null/empty fonts", () => {
-    expect(buildFontFaceCss(null)).toBe("");
+    expect(buildFontFaceCss(null as unknown as Record<string, { data: string; type: string; family?: string }>)).toBe("");
     expect(buildFontFaceCss({})).toBe("");
   });
 
@@ -706,7 +706,7 @@ describe("detectFontFormat", () => {
 
   it("handles empty/null filename", () => {
     expect(detectFontFormat("")).toBe("truetype");
-    expect(detectFontFormat(null)).toBe("truetype");
+    expect(detectFontFormat(null as unknown as string)).toBe("truetype");
   });
 });
 

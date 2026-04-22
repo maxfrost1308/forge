@@ -52,3 +52,10 @@ export declare function detectFontFormat(filename: string): string;
 export declare function escapeCssFontName(name: string): string;
 export declare function compileTemplate(templateStr: string): (data: Record<string, unknown>, deps?: unknown) => string;
 export declare function validateComputedFields(fields: unknown[]): string[];
+export declare function renderCard(
+  template: string,
+  row: Record<string, unknown>,
+  fields: unknown[],
+  cardType: unknown,
+  deps?: Record<string, unknown>,
+): string;

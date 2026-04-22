@@ -23,7 +23,7 @@ describe("integration: render card from inline forge-like data", () => {
   };
 
   it("renders a basic card with field substitution", () => {
-    const template = "<div class=\"card\">{{Name}}</div>";
+    const template = '<div class="card">{{Name}}</div>';
     const row = { Name: "Alice" };
     const html = renderCard(template, row, schema.fields, schema);
     expect(html).toContain("Alice");
