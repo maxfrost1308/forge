@@ -3,21 +3,25 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Browser library for rendering Card Maker .forge projects without the full editor",
-  "main": "src/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": "./src/index.js"
   },
   "scripts": {
-    "test": "vitest run"
+    "build": "tsc",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
-    "papaparse": "^5.4.1",
-    "jszip": "^3.10.1"
+    "jszip": "^3.10.1",
+    "papaparse": "^5.4.1"
   },
   "devDependencies": {
-    "vitest": "^2.1.0",
     "jsdom": "^25.0.0",
+    "jszip": "^3.10.1",
     "papaparse": "^5.4.1",
-    "jszip": "^3.10.1"
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.0"
   }
 }
