@@ -1,6 +1,3 @@
-// Card type validation, CSS scoping, and template sanitization.
-// Pure logic — no DOM APIs, no state imports.
-
 const VALID_FIELD_TYPES = [
   "text",
   "select",
@@ -18,9 +15,9 @@ const VALID_FIELD_TYPES = [
   "computed",
 ];
 
-const TYPE_ALIASES = { textarea: "text-long" };
+const TYPE_ALIASES: Record<string, string> = { textarea: "text-long" };
 
-export function sanitizeTemplate(html) {
+export function sanitizeTemplate(html: string): string {
   let s = html.replace(
     /<script\b[^>]*>[\s\S]*?<\/script>/gi,
     "<!-- script removed -->",
@@ -38,7 +35,7 @@ export function sanitizeTemplate(html) {
   return s;
 }
 
-function sanitizeCss(css) {
+function sanitizeCss(css: string): string {
   let s = css.replace(/@import\b[^;]+;/gi, "/* removed */");
   s = s.replace(
     /url\(\s*(['"]?)(https?:\/\/[^)'"]+)\1\s*\)/gi,
@@ -59,9 +56,9 @@ function sanitizeCss(css) {
   return s;
 }
 
-export function scopeCss(css, cardTypeId) {
+export function scopeCss(css: string, cardTypeId: string): string {
   const scope = `[data-card-type="${cardTypeId}"]`;
-  return css.replace(/([^{}@]+)\{/g, (match, selectorPart) => {
+  return css.replace(/([^{}@]+)\{/g, (match, selectorPart: string) => {
     const trimmed = selectorPart.trim();
     if (trimmed.startsWith("@") || trimmed === "") return match;
     const scoped = trimmed
@@ -80,18 +77,18 @@ export function scopeCss(css, cardTypeId) {
   });
 }
 
-export function processCss(css, cardTypeId, shouldSanitize) {
+export function processCss(css: string, cardTypeId: string, shouldSanitize: boolean): string {
   const processed = shouldSanitize ? sanitizeCss(css) : css;
   return scopeCss(processed, cardTypeId);
 }
 
-function applyTypeAliases(fields) {
+function applyTypeAliases(fields: Array<{ type?: string }>): void {
   for (const f of fields) {
     if (f.type && TYPE_ALIASES[f.type]) f.type = TYPE_ALIASES[f.type];
   }
 }
 
-function validateFields(fields) {
+function validateFields(fields: Array<{ key?: unknown; type?: unknown; options?: unknown }>): void {
   for (const f of fields) {
     if (!f.key || typeof f.key !== "string")
       throw new Error(`Field missing string "key": ${JSON.stringify(f)}`);
@@ -110,38 +107,34 @@ function validateFields(fields) {
   }
 }
 
-/**
- * Validate a card type object. Returns { valid, errors }.
- * @param {object} cardType
- * @returns {{ valid: boolean, errors: string[] }}
- */
-export function validateCardType(cardType) {
-  const errors = [];
+export function validateCardType(cardType: unknown): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
   if (!cardType || typeof cardType !== "object") {
     return { valid: false, errors: ["cardType must be an object"] };
   }
-  if (!cardType.id || typeof cardType.id !== "string")
+  const ct = cardType as Record<string, unknown>;
+  if (!ct.id || typeof ct.id !== "string")
     errors.push('Missing or invalid "id"');
-  if (!cardType.name || typeof cardType.name !== "string")
+  if (!ct.name || typeof ct.name !== "string")
     errors.push('Missing or invalid "name"');
-  if (!cardType.fields || !Array.isArray(cardType.fields)) {
+  if (!ct.fields || !Array.isArray(ct.fields)) {
     errors.push('Missing or invalid "fields" array');
   } else {
     try {
-      validateFields(cardType.fields);
+      validateFields(ct.fields);
     } catch (e) {
-      errors.push(e.message);
+      errors.push((e as Error).message);
     }
   }
   return { valid: errors.length === 0, errors };
 }
 
 export function buildCardTypeFromUpload(
-  schema,
-  frontTemplate,
-  backTemplate,
-  css,
-) {
+  schema: Record<string, unknown>,
+  frontTemplate: string,
+  backTemplate: string | null,
+  css: string,
+): Record<string, unknown> {
   if (!schema.id || typeof schema.id !== "string")
     throw new Error('Schema must have a string "id" field.');
   if (!schema.name || typeof schema.name !== "string")
@@ -170,41 +163,42 @@ export function buildCardTypeFromUpload(
   };
 }
 
-export function buildCardTypeFromBundle(bundle) {
+export function buildCardTypeFromBundle(bundle: unknown): Record<string, unknown> {
   if (!bundle || typeof bundle !== "object")
     throw new Error("Invalid bundle: expected a JSON object.");
-  if (!bundle.id || typeof bundle.id !== "string")
+  const b = bundle as Record<string, unknown>;
+  if (!b.id || typeof b.id !== "string")
     throw new Error('Bundle must have a string "id" field.');
-  if (!bundle.name || typeof bundle.name !== "string")
+  if (!b.name || typeof b.name !== "string")
     throw new Error('Bundle must have a string "name" field.');
-  if (!bundle.fields || !Array.isArray(bundle.fields))
+  if (!b.fields || !Array.isArray(b.fields))
     throw new Error('Bundle must have a "fields" array.');
-  if (!bundle.frontTemplate || typeof bundle.frontTemplate !== "string")
+  if (!b.frontTemplate || typeof b.frontTemplate !== "string")
     throw new Error('Bundle must have a "frontTemplate" string.');
 
-  applyTypeAliases(bundle.fields);
-  validateFields(bundle.fields);
+  applyTypeAliases(b.fields);
+  validateFields(b.fields);
 
-  const isBuiltIn = !!bundle._builtIn;
+  const isBuiltIn = !!b._builtIn;
 
   return {
-    id: bundle.id,
-    name: bundle.name,
-    description: bundle.description || "",
-    cardSize: bundle.cardSize || { width: "63.5mm", height: "88.9mm" },
-    fields: bundle.fields,
-    colorMapping: bundle.colorMapping || null,
-    aggregations: bundle.aggregations || null,
+    id: b.id,
+    name: b.name,
+    description: b.description || "",
+    cardSize: b.cardSize || { width: "63.5mm", height: "88.9mm" },
+    fields: b.fields,
+    colorMapping: b.colorMapping || null,
+    aggregations: b.aggregations || null,
     frontTemplate: isBuiltIn
-      ? bundle.frontTemplate
-      : sanitizeTemplate(bundle.frontTemplate),
-    backTemplate: bundle.backTemplate
+      ? b.frontTemplate
+      : sanitizeTemplate(b.frontTemplate as string),
+    backTemplate: b.backTemplate
       ? isBuiltIn
-        ? bundle.backTemplate
-        : sanitizeTemplate(bundle.backTemplate)
+        ? b.backTemplate
+        : sanitizeTemplate(b.backTemplate as string)
       : null,
-    css: bundle.styles || bundle.css || "",
-    sampleData: bundle.sampleData || null,
+    css: (b.styles as string) || (b.css as string) || "",
+    sampleData: b.sampleData || null,
     _builtIn: isBuiltIn,
     _sanitizeCss: !isBuiltIn,
   };

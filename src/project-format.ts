@@ -1,10 +1,7 @@
-// .forge ZIP format serialization/deserialization.
-// Adapted from card-maker — no state.js imports, no DOM deps.
-
+import type JSZip from "jszip";
 import { generateCsv } from "./csv-parser.js";
 
-// Inline from collections-state.js (2 pure functions, no state)
-function serializeCollections(collections) {
+function serializeCollections(collections: string[]): string {
   if (!collections || !Array.isArray(collections)) return "";
   return collections
     .map((s) => s.trim())
@@ -12,7 +9,7 @@ function serializeCollections(collections) {
     .join("|");
 }
 
-function parseCollections(str) {
+function parseCollections(str: string): string[] {
   if (!str || typeof str !== "string") return [];
   return str
     .split("|")
@@ -27,7 +24,7 @@ async function loadJSZip() {
 
 export const CURRENT_FORMAT_VERSION = 5;
 
-function _buildSchema(ct) {
+function _buildSchema(ct: Record<string, unknown>): Record<string, unknown> {
   return {
     id: ct.id,
     name: ct.name,
@@ -39,51 +36,52 @@ function _buildSchema(ct) {
   };
 }
 
-export async function serializeProject(project) {
+export async function serializeProject(project: Record<string, unknown>): Promise<Blob> {
   const JSZip = await loadJSZip();
   const zip = new JSZip();
 
-  const allTypes = project.cardTypes || [project.cardType];
+  const allTypes = (project.cardTypes as Record<string, unknown>[]) || [project.cardType];
 
   const meta = {
     formatVersion: 5,
-    name: project.name || "Untitled Project",
-    createdAt: project.createdAt || new Date().toISOString(),
+    name: (project.name as string) || "Untitled Project",
+    createdAt: (project.createdAt as string) || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    defaultCardType: project.defaultCardType || allTypes[0]?.id || null,
+    defaultCardType: project.defaultCardType || (allTypes[0] as Record<string, unknown>)?.id || null,
     globalVariables: project.globalVariables || {},
     settings: {
       defaultCardSize:
-        project.cardSizePreset || project.settings?.defaultCardSize || null,
-      ...project.settings,
+        project.cardSizePreset || (project.settings as Record<string, unknown>)?.defaultCardSize || null,
+      ...(project.settings as Record<string, unknown>),
     },
   };
 
   zip.file("project.json", JSON.stringify(meta, null, 2));
 
   const dataByType = _splitDataByType(
-    project.data || [],
+    (project.data as Record<string, unknown>[]) || [],
     allTypes,
-    project.defaultCardType || "",
+    (project.defaultCardType as string) || "",
   );
 
   for (const ct of allTypes) {
-    const dir = `card-types/${ct.id}/`;
-    zip.file(`${dir}schema.json`, JSON.stringify(_buildSchema(ct), null, 2));
-    zip.file(`${dir}front.html`, ct.frontTemplate || "");
-    zip.file(`${dir}front.css`, ct.css || ct.styles || "");
-    if (ct.backTemplate) {
-      zip.file(`${dir}back.html`, ct.backTemplate);
+    const ctRec = ct as Record<string, unknown>;
+    const dir = `card-types/${ctRec.id}/`;
+    zip.file(`${dir}schema.json`, JSON.stringify(_buildSchema(ctRec), null, 2));
+    zip.file(`${dir}front.html`, (ctRec.frontTemplate as string) || "");
+    zip.file(`${dir}front.css`, (ctRec.css as string) || (ctRec.styles as string) || "");
+    if (ctRec.backTemplate) {
+      zip.file(`${dir}back.html`, ctRec.backTemplate as string);
     }
-    const typeData = dataByType.get(ct.id) || [];
+    const typeData = dataByType.get(ctRec.id as string) || [];
     if (typeData.length > 0) {
-      const csv = generateCsv(ct.fields, _stripTypeColumn(typeData));
+      const csv = generateCsv(ctRec.fields as Parameters<typeof generateCsv>[0], _stripTypeColumn(typeData));
       zip.file(`${dir}data.csv`, csv);
     }
   }
 
   if (project.assets && Object.keys(project.assets).length > 0) {
-    for (const [filename, asset] of Object.entries(project.assets)) {
+    for (const [filename, asset] of Object.entries(project.assets as Record<string, { data: string }>)) {
       const dataUri = asset.data;
       const base64Match = dataUri.match(/^data:[^;]+;base64,(.+)$/);
       if (base64Match) {
@@ -94,7 +92,7 @@ export async function serializeProject(project) {
   }
 
   if (project.fonts && Object.keys(project.fonts).length > 0) {
-    for (const [filename, font] of Object.entries(project.fonts)) {
+    for (const [filename, font] of Object.entries(project.fonts as Record<string, { data: string }>)) {
       const dataUri = font.data;
       const base64Match = dataUri.match(/^data:[^;]+;base64,(.+)$/);
       if (base64Match) {
@@ -103,8 +101,8 @@ export async function serializeProject(project) {
     }
   }
 
-  if (project.pdfs && Object.keys(project.pdfs).length > 0) {
-    for (const [filename, pdf] of Object.entries(project.pdfs)) {
+  if (project.pdfs && Object.keys(project.pdfs as object).length > 0) {
+    for (const [filename, pdf] of Object.entries(project.pdfs as Record<string, { data: string }>)) {
       const dataUri = pdf.data;
       const base64Match = dataUri.match(/^data:[^;]+;base64,(.+)$/);
       if (base64Match) {
@@ -113,8 +111,8 @@ export async function serializeProject(project) {
     }
   }
 
-  if (project.exportPresets && project.exportPresets.length > 0) {
-    for (const preset of project.exportPresets) {
+  if (project.exportPresets && (project.exportPresets as unknown[]).length > 0) {
+    for (const preset of project.exportPresets as Array<{ id: string }>) {
       zip.file(
         `export-presets/${preset.id}.json`,
         JSON.stringify(preset, null, 2),
@@ -125,7 +123,14 @@ export async function serializeProject(project) {
   return zip.generateAsync({ type: "blob" });
 }
 
-export async function serializeTemplateOnly(cardTypes, options = {}) {
+export async function serializeTemplateOnly(
+  cardTypes: Record<string, unknown>[],
+  options: {
+    name?: string;
+    globalVariables?: Record<string, string>;
+    sampleRows?: number;
+  } = {},
+): Promise<Blob> {
   const JSZip = await loadJSZip();
   const zip = new JSZip();
 
@@ -149,18 +154,18 @@ export async function serializeTemplateOnly(cardTypes, options = {}) {
   for (const ct of cardTypes) {
     const dir = `card-types/${ct.id}/`;
     zip.file(`${dir}schema.json`, JSON.stringify(_buildSchema(ct), null, 2));
-    zip.file(`${dir}front.html`, ct.frontTemplate || "");
-    zip.file(`${dir}front.css`, ct.css || ct.styles || "");
+    zip.file(`${dir}front.html`, (ct.frontTemplate as string) || "");
+    zip.file(`${dir}front.css`, (ct.css as string) || (ct.styles as string) || "");
     if (ct.backTemplate) {
-      zip.file(`${dir}back.html`, ct.backTemplate);
+      zip.file(`${dir}back.html`, ct.backTemplate as string);
     }
     if (
       ct.sampleData &&
       Array.isArray(ct.sampleData) &&
       ct.sampleData.length > 0
     ) {
-      const sampleToInclude = ct.sampleData.slice(0, sampleRows);
-      const csv = generateCsv(ct.fields, sampleToInclude);
+      const sampleToInclude = (ct.sampleData as unknown[]).slice(0, sampleRows);
+      const csv = generateCsv(ct.fields as Parameters<typeof generateCsv>[0], sampleToInclude as Parameters<typeof generateCsv>[1]);
       zip.file(`${dir}sample.csv`, csv);
     }
   }
@@ -168,12 +173,16 @@ export async function serializeTemplateOnly(cardTypes, options = {}) {
   return zip.generateAsync({ type: "blob" });
 }
 
-function _splitDataByType(data, cardTypes, defaultTypeId) {
-  const typeIds = new Set(cardTypes.map((ct) => ct.id));
-  const result = new Map();
-  for (const ct of cardTypes) result.set(ct.id, []);
+function _splitDataByType(
+  data: Record<string, unknown>[],
+  cardTypes: Record<string, unknown>[],
+  defaultTypeId: string,
+): Map<string, Record<string, unknown>[]> {
+  const typeIds = new Set(cardTypes.map((ct) => ct.id as string));
+  const result = new Map<string, Record<string, unknown>[]>();
+  for (const ct of cardTypes) result.set(ct.id as string, []);
 
-  const fallbackId = defaultTypeId || cardTypes[0]?.id;
+  const fallbackId = defaultTypeId || (cardTypes[0]?.id as string);
 
   for (const row of data) {
     const typeId =
@@ -181,25 +190,25 @@ function _splitDataByType(data, cardTypes, defaultTypeId) {
         ? String(row._type)
         : fallbackId;
     if (typeId && result.has(typeId)) {
-      result.get(typeId).push(row);
+      result.get(typeId)!.push(row);
     }
   }
 
   return result;
 }
 
-function _stripTypeColumn(rows) {
+function _stripTypeColumn(rows: Record<string, unknown>[]): Record<string, unknown>[] {
   return rows.map((row) => {
     const copy = { ...row };
     delete copy._type;
     if (Array.isArray(copy._collections)) {
-      copy._collections = serializeCollections(copy._collections);
+      copy._collections = serializeCollections(copy._collections as string[]);
     }
     return copy;
   });
 }
 
-function _assetPath(filename) {
+function _assetPath(filename: string): string {
   if (
     filename.startsWith("image/") ||
     filename.startsWith("front/") ||
@@ -211,7 +220,7 @@ function _assetPath(filename) {
   return `image/${filename}`;
 }
 
-export async function deserializeProject(input) {
+export async function deserializeProject(input: Blob | ArrayBuffer | string): Promise<Record<string, unknown>> {
   const JSZip = await loadJSZip();
   const zip = await JSZip.loadAsync(input);
 
@@ -221,14 +230,14 @@ export async function deserializeProject(input) {
   }
 
   const metaText = await projectFile.async("string");
-  let meta;
+  let meta: Record<string, unknown>;
   try {
     meta = JSON.parse(metaText);
   } catch {
     throw new Error("Invalid .forge file: corrupt project.json");
   }
 
-  const fileVersion = meta.formatVersion || 1;
+  const fileVersion = (meta.formatVersion as number) || 1;
   if (fileVersion > CURRENT_FORMAT_VERSION) {
     throw new Error(
       "This project was created with a newer version of Card Maker",
@@ -242,12 +251,12 @@ export async function deserializeProject(input) {
   return _migrateFromLegacy(zip, meta, fileVersion);
 }
 
-async function _deserializeV5(zip, meta) {
-  const cardTypes = [];
-  const allData = [];
+async function _deserializeV5(zip: JSZip, meta: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const cardTypes: Record<string, unknown>[] = [];
+  const allData: Record<string, unknown>[] = [];
 
-  const cardTypeDirs = new Set();
-  zip.forEach((path) => {
+  const cardTypeDirs = new Set<string>();
+  zip.forEach((path: string) => {
     const match = path.match(/^card-types\/([^/]+)\//);
     if (match) cardTypeDirs.add(match[1]);
   });
@@ -280,11 +289,11 @@ async function _deserializeV5(zip, meta) {
         const { parseCsv } = await import("./csv-parser.js");
         const result = await parseCsv(csvText);
         for (const row of result.data) {
-          row._type = typeId;
-          if (typeof row._collections === "string" && row._collections) {
-            row._collections = parseCollections(row._collections);
+          (row as Record<string, unknown>)._type = typeId;
+          if (typeof (row as Record<string, unknown>)._collections === "string" && (row as Record<string, unknown>)._collections) {
+            (row as Record<string, unknown>)._collections = parseCollections((row as Record<string, string>)._collections);
           }
-          allData.push(row);
+          allData.push(row as Record<string, unknown>);
         }
       }
     }
@@ -299,13 +308,13 @@ async function _deserializeV5(zip, meta) {
   const pdfs = await _deserializePdfs(zip);
   const exportPresets = await _deserializeExportPresets(zip);
 
-  const defaultCardType = meta.defaultCardType || cardTypes[0].id;
+  const defaultCardType = (meta.defaultCardType as string) || cardTypes[0].id as string;
   const primaryType =
     cardTypes.find((ct) => ct.id === defaultCardType) || cardTypes[0];
 
-  const settings = meta.settings || {};
+  const settings = (meta.settings as Record<string, unknown>) || {};
   return {
-    name: meta.name || "Untitled Project",
+    name: (meta.name as string) || "Untitled Project",
     formatVersion: 5,
     createdAt: meta.createdAt,
     updatedAt: meta.updatedAt,
@@ -325,45 +334,45 @@ async function _deserializeV5(zip, meta) {
   };
 }
 
-async function _migrateFromLegacy(zip, meta, fileVersion) {
-  let cardTypes;
+async function _migrateFromLegacy(zip: JSZip, meta: Record<string, unknown>, fileVersion: number): Promise<Record<string, unknown>> {
+  let cardTypes: Record<string, unknown>[];
   if (
     meta.cardTypes &&
     Array.isArray(meta.cardTypes) &&
     meta.cardTypes.length > 0
   ) {
-    cardTypes = meta.cardTypes;
+    cardTypes = meta.cardTypes as Record<string, unknown>[];
     if (!meta.cardType) meta.cardType = meta.cardTypes[0];
-  } else if (meta.cardType && meta.cardType.id && meta.cardType.fields) {
-    cardTypes = [meta.cardType];
-    meta.defaultCardType = meta.cardType.id;
+  } else if (meta.cardType && (meta.cardType as Record<string, unknown>).id && (meta.cardType as Record<string, unknown>).fields) {
+    cardTypes = [meta.cardType as Record<string, unknown>];
+    meta.defaultCardType = (meta.cardType as Record<string, unknown>).id;
   } else {
     throw new Error("Invalid .forge file: missing card type definition");
   }
 
-  const primaryCt = meta.cardType;
+  const primaryCt = meta.cardType as Record<string, unknown>;
   if (!primaryCt || !primaryCt.id || !primaryCt.fields) {
     throw new Error("Invalid .forge file: missing card type definition");
   }
 
-  let data = [];
+  let data: Record<string, unknown>[] = [];
   const dataFile = zip.file("data/data.csv");
   if (dataFile) {
     const csvText = await dataFile.async("string");
     if (csvText.trim()) {
       const { parseCsv } = await import("./csv-parser.js");
       const result = await parseCsv(csvText);
-      data = result.data;
+      data = result.data as Record<string, unknown>[];
       for (const row of data) {
         if (typeof row._collections === "string" && row._collections) {
-          row._collections = parseCollections(row._collections);
+          row._collections = parseCollections(row._collections as string);
         }
       }
     }
   }
 
-  const assets = {};
-  const assetManifest = meta.assetManifest || {};
+  const assets: Record<string, unknown> = {};
+  const assetManifest = (meta.assetManifest as Record<string, { type?: string; size?: number }>) || {};
   for (const [filename, info] of Object.entries(assetManifest)) {
     const assetFile = zip.file(`assets/${filename}`);
     if (assetFile) {
@@ -378,8 +387,8 @@ async function _migrateFromLegacy(zip, meta, fileVersion) {
     }
   }
 
-  const fonts = {};
-  const fontManifest = meta.fontManifest || {};
+  const fonts: Record<string, unknown> = {};
+  const fontManifest = (meta.fontManifest as Record<string, { type?: string; size?: number; family?: string }>) || {};
   for (const [filename, info] of Object.entries(fontManifest)) {
     const fontFile = zip.file(`assets/fonts/${filename}`);
     if (fontFile) {
@@ -395,7 +404,7 @@ async function _migrateFromLegacy(zip, meta, fileVersion) {
   }
 
   return {
-    name: meta.name || "Untitled Project",
+    name: (meta.name as string) || "Untitled Project",
     formatVersion: fileVersion,
     createdAt: meta.createdAt,
     updatedAt: meta.updatedAt,
@@ -415,11 +424,11 @@ async function _migrateFromLegacy(zip, meta, fileVersion) {
   };
 }
 
-async function _deserializeAssets(zip) {
-  const assets = {};
-  const assetFiles = [];
+async function _deserializeAssets(zip: JSZip): Promise<Record<string, unknown>> {
+  const assets: Record<string, unknown> = {};
+  const assetFiles: string[] = [];
 
-  zip.forEach((path, entry) => {
+  zip.forEach((path: string, entry: { dir: boolean }) => {
     if (
       path.startsWith("assets/") &&
       !path.startsWith("assets/fonts/") &&
@@ -453,11 +462,11 @@ async function _deserializeAssets(zip) {
   return assets;
 }
 
-async function _deserializeFonts(zip) {
-  const fonts = {};
-  const fontFiles = [];
+async function _deserializeFonts(zip: JSZip): Promise<Record<string, unknown>> {
+  const fonts: Record<string, unknown> = {};
+  const fontFiles: string[] = [];
 
-  zip.forEach((path, entry) => {
+  zip.forEach((path: string, entry: { dir: boolean }) => {
     if (path.startsWith("assets/fonts/") && !entry.dir) fontFiles.push(path);
   });
 
@@ -479,11 +488,11 @@ async function _deserializeFonts(zip) {
   return fonts;
 }
 
-async function _deserializePdfs(zip) {
-  const pdfs = {};
-  const pdfFiles = [];
+async function _deserializePdfs(zip: JSZip): Promise<Record<string, unknown>> {
+  const pdfs: Record<string, unknown> = {};
+  const pdfFiles: string[] = [];
 
-  zip.forEach((path, entry) => {
+  zip.forEach((path: string, entry: { dir: boolean }) => {
     if (path.startsWith("assets/pdf/") && !entry.dir) pdfFiles.push(path);
   });
 
@@ -503,11 +512,11 @@ async function _deserializePdfs(zip) {
   return pdfs;
 }
 
-async function _deserializeExportPresets(zip) {
-  const presets = [];
-  const presetFiles = [];
+async function _deserializeExportPresets(zip: JSZip): Promise<unknown[]> {
+  const presets: unknown[] = [];
+  const presetFiles: string[] = [];
 
-  zip.forEach((path, entry) => {
+  zip.forEach((path: string, entry: { dir: boolean }) => {
     if (
       path.startsWith("export-presets/") &&
       path.endsWith(".json") &&
@@ -531,8 +540,8 @@ async function _deserializeExportPresets(zip) {
   return presets;
 }
 
-function _mimeFromExt(ext) {
-  const map = {
+function _mimeFromExt(ext: string): string {
+  const map: Record<string, string> = {
     png: "image/png",
     jpg: "image/jpeg",
     jpeg: "image/jpeg",
@@ -544,8 +553,8 @@ function _mimeFromExt(ext) {
   return map[ext] || "application/octet-stream";
 }
 
-function _fontMimeFromExt(ext) {
-  const map = {
+function _fontMimeFromExt(ext: string): string {
+  const map: Record<string, string> = {
     ttf: "font/ttf",
     otf: "font/otf",
     woff: "font/woff",
@@ -554,33 +563,36 @@ function _fontMimeFromExt(ext) {
   return map[ext] || "font/ttf";
 }
 
-export function validateProject(project) {
-  const errors = [];
+export function validateProject(project: unknown): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
 
   if (!project)
     return { valid: false, errors: ["Project is null or undefined"] };
 
+  const p = project as Record<string, unknown>;
+
   if (
-    project.cardTypes &&
-    Array.isArray(project.cardTypes) &&
-    project.cardTypes.length > 0
+    p.cardTypes &&
+    Array.isArray(p.cardTypes) &&
+    p.cardTypes.length > 0
   ) {
-    for (let i = 0; i < project.cardTypes.length; i++) {
-      const ct = project.cardTypes[i];
+    for (let i = 0; i < p.cardTypes.length; i++) {
+      const ct = p.cardTypes[i] as Record<string, unknown>;
       if (!ct.id) errors.push(`cardTypes[${i}]: missing id`);
       if (!ct.fields || !Array.isArray(ct.fields))
         errors.push(`cardTypes[${i}]: missing or invalid fields`);
-      if (!ct.frontTemplate && !project.editorData)
+      if (!ct.frontTemplate && !p.editorData)
         errors.push(`cardTypes[${i}]: missing frontTemplate`);
     }
-  } else if (!project.cardType) {
+  } else if (!p.cardType) {
     errors.push("Missing cardType");
   } else {
-    if (!project.cardType.id) errors.push("Missing cardType.id");
-    if (!project.cardType.fields || !Array.isArray(project.cardType.fields)) {
+    const ct = p.cardType as Record<string, unknown>;
+    if (!ct.id) errors.push("Missing cardType.id");
+    if (!ct.fields || !Array.isArray(ct.fields)) {
       errors.push("Missing or invalid cardType.fields");
     }
-    if (!project.cardType.frontTemplate && !project.editorData) {
+    if (!ct.frontTemplate && !p.editorData) {
       errors.push("Missing cardType.frontTemplate");
     }
   }

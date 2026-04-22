@@ -1,5 +1,3 @@
-// Copyright (c) 2026 maxfrost1308
-// Licensed under AGPL-3.0. See LICENSE in the project root.
 /**
  * Mustache-like template renderer for card templates.
  *
@@ -39,37 +37,62 @@ import { scopeCss } from "./card-type-registry-core.js";
 import { hashTagColor } from "./color-utils.js";
 import { getCardsByType } from "./project-query.js";
 
-/** @typedef {Record<string, unknown>} TemplateData */
-/** @typedef {{ id: string, fields: object[], colorMapping?: object|null }} CardType */
-/** @typedef {{ key: string, type: string, label?: string, separator?: string, expression?: string }} CardField */
-/** @typedef {Record<string, unknown>} CardRow */
-/** @typedef {{ data: string, type: string }} AssetEntry */
+type TemplateData = Record<string, unknown>;
 
-/**
- * @typedef {{
- *   globalVariables?: Record<string, string>,
- *   getAsset?: (name: string) => object | null,
- *   hashTagColor?: (value: string) => string
- * }} RenderDeps
- */
+interface CardType {
+  id: string;
+  fields: CardField[];
+  colorMapping?: Record<string, ColorMappingEntry> | null;
+  frontTemplate?: string;
+  backTemplate?: string | null;
+  css?: string;
+  cardSize?: { width: string; height: string };
+}
 
-/**
- * @typedef {object} Token
- * @property {string} type
- * @property {string} [text]
- * @property {string} [field]
- * @property {string} [filename]
- * @property {string} [helper]
- * @property {string} [args]
- * @property {string} [tag]
- * @property {string} [name]
- * @property {string} [arg]
- */
+interface CardField {
+  key: string;
+  type: string;
+  label?: string;
+  separator?: string;
+  expression?: string;
+}
 
-/** @typedef {(data: TemplateData, deps?: RenderDeps) => string} SegmentFn */
+type CardRow = Record<string, unknown>;
 
-/** @type {Record<string, string>} */
-const ESC_MAP = {
+interface AssetEntry {
+  data: string;
+  type: string;
+}
+
+interface ColorMappingEntry {
+  field: string;
+  map?: Record<string, string>;
+  default?: string;
+  auto?: boolean;
+}
+
+interface RenderDeps {
+  globalVariables?: Record<string, string>;
+  getAsset?: (name: string) => AssetEntry | null;
+  hashTagColor?: (value: string) => string;
+}
+
+interface Token {
+  type: string;
+  text?: string;
+  field?: string;
+  filename?: string;
+  helper?: string;
+  args?: string;
+  tag?: string;
+  name?: string;
+  arg?: string;
+}
+
+type SegmentFn = (data: TemplateData, deps?: RenderDeps) => string;
+type SegmentArray = SegmentFn[] & { _hasPlaceholder?: boolean };
+
+const ESC_MAP: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
   ">": "&gt;",
@@ -77,26 +100,16 @@ const ESC_MAP = {
   "'": "&#39;",
 };
 
-/**
- * @param {string} str
- * @returns {string}
- */
-export function escapeHtml(str) {
+export function escapeHtml(str: string): string {
   return String(str).replace(/[&<>"']/g, (c) => ESC_MAP[c] || c);
 }
 
-/**
- * @param {string} filename
- * @returns {string}
- */
-function _missingAssetPlaceholder(filename) {
+function _missingAssetPlaceholder(filename: string): string {
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#ccc"/><text x="100" y="90" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#666">Missing:</text><text x="100" y="115" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#666">${filename}</text></svg>`)}`;
 }
 
-// ── Template compilation & caching (REQ-070) ──────────────────────────────────
-
-/** @type {Map<string, SegmentFn>} */
-const templateCache = new Map();
+/** @type {Map<string, SegmentFn>} — global cache, NOT per-project */
+const templateCache = new Map<string, SegmentFn>();
 
 const TOKEN_RE =
   /\{\{\{icon:(\w+)\}\}\}|\{\{\{qr:(\w+)\}\}\}|\{\{\{asset:([\w.\-]+)\}\}\}|\{\{\{([\w.@]+)\}\}\}|\{\{#(eq|neq|gt|lt|gte|lte|and|or|not)\s+([^}]+)\}\}|\{\{#(\w+)\}\}|\{\{\^(\w+)\}\}|\{\{\/([\w]+)\}\}|\{\{\$(\w+)\}\}|\{\{(upper|lower|capitalize|truncate)\s+(\w+)(?:\s+(\d+))?\}\}|\{\{([\w.@]+)\}\}/g;
@@ -104,46 +117,28 @@ const TOKEN_RE =
 const COMPARISON_HELPERS = new Set(["eq", "neq", "gt", "lt", "gte", "lte"]);
 const BINARY_LOGIC_HELPERS = new Set(["and", "or"]);
 
-/**
- * @param {string} templateStr
- * @returns {SegmentFn}
- */
-export function compileTemplate(templateStr) {
+export function compileTemplate(templateStr: string): SegmentFn {
   const cached = templateCache.get(templateStr);
   if (cached) return cached;
   const tokens = _tokenize(templateStr);
-  /** @type {{ pos: number }} */
   const ctx = { pos: 0 };
   const segs = _parse(tokens, ctx, null);
-  /** @type {SegmentFn} */
-  const fn = (data, deps) => _exec(segs, data, deps);
+  const fn: SegmentFn = (data, deps) => _exec(segs, data, deps);
   templateCache.set(templateStr, fn);
   return fn;
 }
 
-/**
- * @param {SegmentFn[]} segs
- * @param {TemplateData} data
- * @param {RenderDeps} [deps]
- * @returns {string}
- */
-function _exec(segs, data, deps) {
+function _exec(segs: SegmentFn[], data: TemplateData, deps?: RenderDeps): string {
   let out = "";
   for (const s of segs) out += s(data, deps);
   return out;
 }
 
-/**
- * @param {string} template
- * @returns {Token[]}
- */
-function _tokenize(template) {
-  /** @type {Token[]} */
-  const tokens = [];
+function _tokenize(template: string): Token[] {
+  const tokens: Token[] = [];
   const re = new RegExp(TOKEN_RE.source, "g");
   let last = 0;
-  /** @type {RegExpExecArray|null} */
-  let m;
+  let m: RegExpExecArray | null;
 
   while ((m = re.exec(template)) !== null) {
     if (m.index > last) {
@@ -189,20 +184,8 @@ function _tokenize(template) {
   return tokens;
 }
 
-/**
- * @typedef {SegmentFn[] & { _hasPlaceholder?: boolean }} SegmentArray
- */
-
-/**
- * Recursive descent parser: consumes tokens via ctx.pos and builds segment arrays.
- * @param {Token[]} tokens
- * @param {{ pos: number }} ctx
- * @param {string|null} closeTag
- * @returns {SegmentArray}
- */
-function _parse(tokens, ctx, closeTag) {
-  /** @type {SegmentArray} */
-  const segs = /** @type {SegmentArray} */ ([]);
+function _parse(tokens: Token[], ctx: { pos: number }, closeTag: string | null): SegmentArray {
+  const segs: SegmentArray = [];
   let hasPlaceholder = false;
 
   while (ctx.pos < tokens.length) {
@@ -292,13 +275,7 @@ function _parse(tokens, ctx, closeTag) {
   return segs;
 }
 
-/**
- * @param {string} helper
- * @param {string} field
- * @param {string|undefined} arg
- * @returns {SegmentFn}
- */
-function _makeStringHelperSeg(helper, field, arg) {
+function _makeStringHelperSeg(helper: string, field: string, arg: string | undefined): SegmentFn {
   return (data) => {
     const val = data[field];
     if (val === undefined || val === null) return "";
@@ -315,13 +292,12 @@ function _makeStringHelperSeg(helper, field, arg) {
   };
 }
 
-/**
- * @param {SegmentArray} segs
- * @param {Token} tok
- * @param {Token[]} tokens
- * @param {{ pos: number }} ctx
- */
-function _pushBlockSeg(segs, tok, tokens, ctx) {
+function _pushBlockSeg(
+  segs: SegmentArray,
+  tok: Token,
+  tokens: Token[],
+  ctx: { pos: number },
+): void {
   const helper = tok.helper;
 
   if (helper === "section") {
@@ -400,22 +376,14 @@ function _pushBlockSeg(segs, tok, tokens, ctx) {
   }
 }
 
-/**
- * @param {unknown} val
- * @returns {boolean}
- */
-function _isTruthy(val) {
+function _isTruthy(val: unknown): boolean {
   if (val === undefined || val === null || val === "" || val === "0")
     return false;
   if (Array.isArray(val)) return val.length > 0;
   return true;
 }
 
-/**
- * @param {string} argsStr
- * @returns {{ field: string, value: string }}
- */
-function _parseComparisonArgs(argsStr) {
+function _parseComparisonArgs(argsStr: string): { field: string; value: string } {
   const str = argsStr.trim();
   const quotedMatch = str.match(/^(\w+)\s+["']([^"']*)["']$/);
   if (quotedMatch) return { field: quotedMatch[1], value: quotedMatch[2] };
@@ -423,14 +391,12 @@ function _parseComparisonArgs(argsStr) {
   return { field: parts[0], value: parts[1] || "" };
 }
 
-/**
- * @param {string} helper
- * @param {string} field
- * @param {string} expected
- * @param {TemplateData} data
- * @returns {boolean}
- */
-function _evalComparison(helper, field, expected, data) {
+function _evalComparison(
+  helper: string,
+  field: string,
+  expected: string,
+  data: TemplateData,
+): boolean {
   const val = data[field];
   const str = val === undefined || val === null ? "" : String(val);
 
@@ -448,23 +414,18 @@ function _evalComparison(helper, field, expected, data) {
   return false;
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
-
-/**
- * @param {CardRow} row
- * @param {CardField[]} fields
- * @param {CardType|null} cardType
- * @param {RenderDeps} [deps]
- * @returns {TemplateData}
- */
-export function preprocessRow(row, fields, cardType, deps = {}) {
+export function preprocessRow(
+  row: CardRow,
+  fields: CardField[],
+  cardType: CardType | null,
+  deps: RenderDeps = {},
+): TemplateData {
   const { hashTagColor: htc = () => "", getAsset: ga = () => null } = deps;
-  /** @type {TemplateData} */
-  const data = {};
+  const data: TemplateData = {};
   for (const field of fields) {
     if (field.type === "computed") continue;
 
-    let val = row[field.key];
+    let val: unknown = row[field.key];
     if (val === undefined || val === null) val = "";
     if (typeof val === "string") val = val.trim();
 
@@ -496,15 +457,13 @@ export function preprocessRow(row, fields, cardType, deps = {}) {
     if (!(key in data)) {
       data[key] = row[key];
       if (typeof row[key] === "string") {
-        data[`${key}_lower`] = row[key].toLowerCase().replace(/\s+/g, "-");
+        data[`${key}_lower`] = (row[key] as string).toLowerCase().replace(/\s+/g, "-");
       }
     }
   }
 
   if (cardType && cardType.colorMapping) {
-    for (const [targetField, mapping] of Object.entries(
-      cardType.colorMapping,
-    )) {
+    for (const [targetField, mapping] of Object.entries(cardType.colorMapping)) {
       if (!data[targetField] || data[targetField] === "") {
         const sourceVal = data[mapping.field];
         const sourceStr = Array.isArray(sourceVal)
@@ -545,25 +504,21 @@ export function preprocessRow(row, fields, cardType, deps = {}) {
   return data;
 }
 
-/**
- * @param {string} template
- * @param {TemplateData} data
- * @param {RenderDeps} [deps]
- * @returns {string}
- */
-export function renderTemplate(template, data, deps = {}) {
+export function renderTemplate(
+  template: string,
+  data: TemplateData,
+  deps: RenderDeps = {},
+): string {
   return compileTemplate(template)(data, deps);
 }
 
-/**
- * @param {string} template
- * @param {CardRow} row
- * @param {CardField[]} fields
- * @param {CardType|null} cardType
- * @param {RenderDeps} [deps]
- * @returns {string}
- */
-export function renderCard(template, row, fields, cardType, deps = {}) {
+export function renderCard(
+  template: string,
+  row: CardRow,
+  fields: CardField[],
+  cardType: CardType | null,
+  deps: RenderDeps = {},
+): string {
   const {
     globalVariables = {},
     getAsset: ga = () => null,
@@ -573,21 +528,16 @@ export function renderCard(template, row, fields, cardType, deps = {}) {
     getAsset: ga,
     hashTagColor: htc,
   });
-  const withVars = /** @type {TemplateData} */ (
-    injectVariables(data, globalVariables)
-  );
+  const withVars = injectVariables(data, globalVariables) as TemplateData;
   return renderTemplate(template, withVars, deps);
 }
 
-/**
- * @param {CardRow} row
- * @param {CardType} cardType
- * @param {(value: string) => string} [hashTagColorFn]
- * @returns {Record<string, string>}
- */
-export function getAutoColorVars(row, cardType, hashTagColorFn = () => "") {
-  /** @type {Record<string, string>} */
-  const vars = {};
+export function getAutoColorVars(
+  row: CardRow,
+  cardType: CardType,
+  hashTagColorFn: (v: string) => string = () => "",
+): Record<string, string> {
+  const vars: Record<string, string> = {};
   if (!cardType || !cardType.colorMapping) return vars;
   for (const [key, mapping] of Object.entries(cardType.colorMapping)) {
     const sourceVal = row[mapping.field];
@@ -607,14 +557,10 @@ export function getAutoColorVars(row, cardType, hashTagColorFn = () => "") {
   return vars;
 }
 
-// ── Asset reference resolution (gap-11 R5) ───────────────────────────────────
-
-/**
- * @param {string} value
- * @param {(name: string) => object | null} [getAssetFn]
- * @returns {string}
- */
-export function resolveAssetReference(value, getAssetFn = () => null) {
+export function resolveAssetReference(
+  value: string,
+  getAssetFn: (name: string) => AssetEntry | null = () => null,
+): string {
   if (!value) return "";
   const str = value.trim();
   if (str.startsWith("http://") || str.startsWith("https://")) return str;
@@ -631,16 +577,14 @@ export function resolveAssetReference(value, getAssetFn = () => null) {
   return str;
 }
 
-/**
- * @param {string} css
- * @param {(name: string) => object | null} [getAssetFn]
- * @returns {string}
- */
-export function preprocessCssAssets(css, getAssetFn = () => null) {
+export function preprocessCssAssets(
+  css: string,
+  getAssetFn: (name: string) => AssetEntry | null = () => null,
+): string {
   if (!css) return css;
   return css.replace(
     /\{\{\{asset:([\w.\-]+)\}\}\}/g,
-    (_match, /** @type {string} */ filename) => {
+    (_match: string, filename: string) => {
       const asset =
         getAssetFn(filename) ||
         (!filename.includes("/") && getAssetFn(`image/${filename}`));
@@ -651,31 +595,28 @@ export function preprocessCssAssets(css, getAssetFn = () => null) {
   );
 }
 
-// ── High-level project rendering ─────────────────────────────────────────────
-// Extracted from card-maker: font-manager.js (detectFontFormat, _escapeCssFontName)
-// and print-layout-builder.js (buildFontFaceCss).
+interface ForgeProject {
+  name: string;
+  cardTypes: CardType[];
+  data: CardRow[];
+  globalVariables: Record<string, string>;
+  assets: Record<string, AssetEntry>;
+  fonts: Record<string, AssetEntry & { family?: string }>;
+}
 
-/**
- * @typedef {{
- *   name: string,
- *   cardTypes: CardType[],
- *   data: CardRow[],
- *   globalVariables: Record<string, string>,
- *   assets: Record<string, AssetEntry>,
- *   fonts: Record<string, AssetEntry & { family?: string }>
- * }} ForgeProject
- */
+interface RenderFullCardOptions {
+  side?: 'front' | 'back';
+}
 
-/**
- * @typedef {{ side?: 'front' | 'back' }} RenderFullCardOptions
- */
+interface RenderFullCardResult {
+  html: string;
+  css: string;
+  width: string;
+  height: string;
+  cardTypeId: string;
+}
 
-/**
- * @typedef {{ html: string, css: string, width: string, height: string, cardTypeId: string }} RenderFullCardResult
- */
-
-/** @param {string} filename */
-export function detectFontFormat(filename) {
+export function detectFontFormat(filename: string): string {
   const ext = (filename || "").toLowerCase().split(".").pop();
   switch (ext) {
     case "otf":
@@ -689,16 +630,13 @@ export function detectFontFormat(filename) {
   }
 }
 
-/** @param {string} name */
-export function escapeCssFontName(name) {
+export function escapeCssFontName(name: string): string {
   return name.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-/**
- * @param {Record<string, AssetEntry & { family?: string }>} fonts
- * @returns {string}
- */
-export function buildFontFaceCss(fonts) {
+export function buildFontFaceCss(
+  fonts: Record<string, AssetEntry & { family?: string }>,
+): string {
   if (!fonts) return "";
   const entries = Object.entries(fonts);
   if (entries.length === 0) return "";
@@ -706,24 +644,17 @@ export function buildFontFaceCss(fonts) {
     .filter(([, f]) => f.family && f.data)
     .map(
       ([filename, f]) =>
-        `@font-face{font-family:"${escapeCssFontName(f.family)}";src:url(${f.data}) format('${detectFontFormat(filename)}');font-display:swap}`,
+        `@font-face{font-family:"${escapeCssFontName(f.family!)}";src:url(${f.data}) format('${detectFontFormat(filename)}');font-display:swap}`,
     )
     .join("");
 }
 
-/**
- * Render a complete card with all CSS ready to inject into the DOM.
- * Handles font-face injection, CSS asset resolution, and CSS scoping.
- *
- * @param {ForgeProject} project
- * @param {string} cardTypeId
- * @param {CardRow} row - row data for template rendering. When `side` is
- *   `'back'` and `row` is empty (`{}`), the first matching row for the card
- *   type is automatically used from `project.data`.
- * @param {RenderFullCardOptions} [options]
- * @returns {RenderFullCardResult | null}
- */
-export function renderFullCard(project, cardTypeId, row, options = {}) {
+export function renderFullCard(
+  project: ForgeProject,
+  cardTypeId: string,
+  row: CardRow,
+  options: RenderFullCardOptions = {},
+): RenderFullCardResult | null {
   const { side = "front" } = options;
   const cardType = (project.cardTypes || []).find((ct) => ct.id === cardTypeId);
   if (!cardType) return null;
@@ -732,18 +663,15 @@ export function renderFullCard(project, cardTypeId, row, options = {}) {
     side === "back" ? cardType.backTemplate : cardType.frontTemplate;
   if (!template) return null;
 
-  // Auto-resolve row data for back-side rendering: if the caller passed an
-  // empty row, use the first data row for this card type so that back
-  // templates referencing row fields (e.g. {{back_image}}) render real data.
   let resolvedRow = row;
   if (side === "back" && Object.keys(row).length === 0) {
-    const rows = getCardsByType(project, cardTypeId);
+    const rows = getCardsByType(project as unknown as Record<string, unknown>, cardTypeId) as CardRow[];
     if (rows.length > 0) {
       resolvedRow = rows[0];
     }
   }
 
-  const getAsset = (name) =>
+  const getAsset = (name: string): AssetEntry | null =>
     (project.assets && project.assets[name]) ||
     (project.fonts && project.fonts[name]) ||
     null;
@@ -781,28 +709,15 @@ export function renderFullCard(project, cardTypeId, row, options = {}) {
   };
 }
 
-// ── Computed field expression evaluator ───────────────────────────────────────
-
-/**
- * @param {string} expression
- * @param {TemplateData} data
- * @returns {number}
- */
-export function evaluateExpression(expression, data) {
+export function evaluateExpression(expression: string, data: TemplateData): number {
   const tokens = _tokenizeExpr(expression);
-  /** @type {{ pos: number }} */
   const ctx = { pos: 0 };
   const result = _exprAddSub(tokens, ctx, data);
   return isNaN(result) ? 0 : result;
 }
 
-/**
- * @param {CardField[]} fields
- * @returns {string[]}
- */
-export function validateComputedFields(fields) {
-  /** @type {string[]} */
-  const errors = [];
+export function validateComputedFields(fields: CardField[]): string[] {
+  const errors: string[] = [];
   const computedKeys = new Set(
     fields.filter((f) => f.type === "computed").map((f) => f.key),
   );
@@ -821,27 +736,15 @@ export function validateComputedFields(fields) {
   return errors;
 }
 
-/**
- * @param {string} expr
- * @returns {string[]}
- */
-function _tokenizeExpr(expr) {
-  /** @type {string[]} */
-  const tokens = [];
+function _tokenizeExpr(expr: string): string[] {
+  const tokens: string[] = [];
   const re = /\s*([+\-*/()]|\d+(?:\.\d+)?|[a-zA-Z_]\w*)\s*/g;
-  /** @type {RegExpExecArray|null} */
-  let m;
+  let m: RegExpExecArray | null;
   while ((m = re.exec(expr)) !== null) tokens.push(m[1]);
   return tokens;
 }
 
-/**
- * @param {string[]} tokens
- * @param {{ pos: number }} ctx
- * @param {TemplateData} data
- * @returns {number}
- */
-function _exprAddSub(tokens, ctx, data) {
+function _exprAddSub(tokens: string[], ctx: { pos: number }, data: TemplateData): number {
   let left = _exprMulDiv(tokens, ctx, data);
   while (
     ctx.pos < tokens.length &&
@@ -854,13 +757,7 @@ function _exprAddSub(tokens, ctx, data) {
   return left;
 }
 
-/**
- * @param {string[]} tokens
- * @param {{ pos: number }} ctx
- * @param {TemplateData} data
- * @returns {number}
- */
-function _exprMulDiv(tokens, ctx, data) {
+function _exprMulDiv(tokens: string[], ctx: { pos: number }, data: TemplateData): number {
   let left = _exprAtom(tokens, ctx, data);
   while (
     ctx.pos < tokens.length &&
@@ -873,13 +770,7 @@ function _exprMulDiv(tokens, ctx, data) {
   return left;
 }
 
-/**
- * @param {string[]} tokens
- * @param {{ pos: number }} ctx
- * @param {TemplateData} data
- * @returns {number}
- */
-function _exprAtom(tokens, ctx, data) {
+function _exprAtom(tokens: string[], ctx: { pos: number }, data: TemplateData): number {
   if (ctx.pos >= tokens.length) return 0;
   const tok = tokens[ctx.pos];
   if (tok === "(") {

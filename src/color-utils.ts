@@ -29,10 +29,8 @@ const AUTO_COLORS = [
 /**
  * Get a consistent color for a value based on its name hash.
  * Uses the curated AUTO_COLORS palette for deterministic results.
- * @param {string} value
- * @returns {string} CSS hex color string
  */
-export function hashTagColor(value) {
+export function hashTagColor(value: string): string {
   let hash = 0;
   for (let i = 0; i < value.length; i++) {
     hash = ((hash << 5) - hash + value.charCodeAt(i)) | 0;

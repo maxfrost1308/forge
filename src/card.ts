@@ -49,6 +49,8 @@ export class Card {
     }
 
     const projectLike = {
+      name: project.name,
+      formatVersion: 5,
       cardTypes: project.cardTypes.map((ct) =>
         ct.id === cardTypeId ? effectiveCardType : ct,
       ),

@@ -3,11 +3,7 @@
  * Variables use {{$varName}} syntax in templates.
  */
 
-/**
- * @param {string} name
- * @returns {{ valid: boolean, error?: string }}
- */
-export function validateVariableName(name) {
+export function validateVariableName(name: string): { valid: boolean; error?: string } {
   if (!name || typeof name !== "string") {
     return { valid: false, error: "Variable name is required" };
   }
@@ -25,11 +21,11 @@ export function validateVariableName(name) {
 
 /**
  * Inject global variables into template data with '$' prefix.
- * @param {Record<string, unknown>} data
- * @param {Record<string, string>} variables
- * @returns {Record<string, unknown>}
  */
-export function injectVariables(data, variables) {
+export function injectVariables(
+  data: Record<string, unknown>,
+  variables: Record<string, string>,
+): Record<string, unknown> {
   if (!variables || typeof variables !== "object") return data;
   const keys = Object.keys(variables);
   if (keys.length === 0) return data;
@@ -43,12 +39,10 @@ export function injectVariables(data, variables) {
 
 /**
  * Find all {{$varName}} references in a template string.
- * @param {string} template
- * @returns {string[]}
  */
-export function findVariableReferences(template) {
+export function findVariableReferences(template: string): string[] {
   if (!template || typeof template !== "string") return [];
-  const refs = new Set();
+  const refs = new Set<string>();
   const re = /\{\{\$(\w+)\}\}/g;
   let m;
   while ((m = re.exec(template)) !== null) {
