@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import Papa from 'papaparse';
+import { ReadonlyProject } from './readonly-project';
 import type {
   ForgeProject,
   ForgeCardType,
@@ -665,6 +666,10 @@ export class Project {
 
   removeFont(name: string): void {
     delete this._state.fonts[name];
+  }
+
+  readonly(): ReadonlyProject {
+    return new ReadonlyProject(this);
   }
 
   async importCsv(csvText: string, cardTypeId?: string): Promise<void> {
