@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import Papa from 'papaparse';
 import { ReadonlyProject } from './readonly-project';
+import { buildFontFaceCss as _buildFontFaceCss, preprocessCssAssets as _preprocessCssAssets } from './template-renderer';
 import type {
   ForgeProject,
   ForgeCardType,
@@ -666,6 +667,14 @@ export class Project {
 
   removeFont(name: string): void {
     delete this._state.fonts[name];
+  }
+
+  buildFontFaceCss(): string {
+    return _buildFontFaceCss(this._state.fonts);
+  }
+
+  preprocessCssAssets(css: string): string {
+    return _preprocessCssAssets(css, (name) => this._state.assets[name] ?? null);
   }
 
   readonly(): ReadonlyProject {
