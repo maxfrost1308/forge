@@ -16,7 +16,7 @@ export { IconCache } from './icon-cache';
 
 // Utility Functions
 export { validateVariableName } from './global-variables';
-export { evaluateExpression } from './template-renderer';
+export { evaluateExpression, detectFontFormat, escapeCssFontName } from './template-renderer';
 export { escapeHtml } from './utils/html';
 export { generateQrSvg } from './utils/qr';
 export { hashTagColor } from './utils/color';
